@@ -1,0 +1,41 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1793803112523,
+      "tag": "0000_soft_argent",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1793804203946,
+      "tag": "0001_messy_norman_osborn",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1793804986853,
+      "tag": "0002_foamy_young_avengers",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1793805410793,
+      "tag": "0003_flat_tusk",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1793806840469,
+      "tag": "0004_warm_timeslip",
+      "breakpoints": true
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "name": "broken-login-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Minimal login API.",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

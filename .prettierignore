@@ -1,0 +1,9 @@
+pnpm-lock.yaml
+implementation.md
+apps/server/src/database/migrations
+.next
+dist
+.next-check
+.next-e2e
+test-results
+playwright-report
