@@ -1,4 +1,5 @@
 import { ProjectsOverview } from "@/components/dashboard/projects-overview";
+import { ImportProject } from "@/components/project/import-project";
 
 export default function ProjectsPage() {
   return (
@@ -6,10 +7,10 @@ export default function ProjectsPage() {
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Projects</h1>
         <p className="text-sm text-muted-foreground">
-          Register a project from the server&apos;s projects directory, then open it to explore
-          files and gather evidence.
+          Import a project from your computer, or open one that is already registered.
         </p>
       </header>
+      <ImportProject />
       <ProjectsOverview />
     </div>
   );

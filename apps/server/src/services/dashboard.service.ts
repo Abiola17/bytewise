@@ -1,4 +1,4 @@
-import { desc, eq, gte } from "drizzle-orm";
+import { count, desc, eq, gte } from "drizzle-orm";
 import type { DashboardSummary, TestOutcomes } from "@bytewise/shared";
 import type { Db } from "../database/client";
 import {
@@ -69,7 +69,11 @@ export function createDashboardService(deps: { db: Db }) {
         .limit(RECENT_ACTIVITY_LIMIT)
         .all();
 
-      const count = (status: string) => runs.filter((r) => r.status === status).length;
+      const runsWith = (status: string) => runs.filter((r) => r.status === status).length;
+      const projectCount = db.select({ n: count() }).from(projects).get()?.n ?? 0;
+      const diagnosisCount =
+        db.select({ n: count() }).from(diagnoses).where(eq(diagnoses.kind, "diagnosis")).get()?.n ??
+        0;
 
       type Activity = DashboardSummary["recentActivity"][number];
       const activity: Array<Omit<Activity, "sessionTitle" | "projectName">> = [
@@ -108,17 +112,19 @@ export function createDashboardService(deps: { db: Db }) {
       ];
 
       return {
+        projects: projectCount,
+        diagnoses: diagnosisCount,
         sessions: {
           total: sessions.size,
           fixVerified: [...sessions.values()].filter((s) => s.status === "fix_verified").length,
         },
         verificationRuns: {
           total: runs.length,
-          passed: count("passed"),
-          failed: count("failed"),
-          timedOut: count("timed_out"),
-          error: count("error"),
-          blocked: count("blocked"),
+          passed: runsWith("passed"),
+          failed: runsWith("failed"),
+          timedOut: runsWith("timed_out"),
+          error: runsWith("error"),
+          blocked: runsWith("blocked"),
         },
         patches: {
           proposed: patches.length,

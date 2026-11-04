@@ -19,7 +19,7 @@ test("diagnose, patch, approve and verify the demo login bug", async ({ page }) 
 
   // 3. Baseline: the real test suite fails before any change.
   await page.getByRole("tab", { name: "Tests" }).click();
-  await page.getByRole("button", { name: "Run" }).click();
+  await page.getByRole("button", { name: "Run", exact: true }).click();
   const result = page.getByRole("region", { name: "Verification result" });
   await expect(result.getByText("Failed", { exact: true })).toBeVisible({ timeout: RUN_TIMEOUT });
   await expect(result.getByText("Baseline (no patch)")).toBeVisible();
@@ -47,7 +47,7 @@ test("diagnose, patch, approve and verify the demo login bug", async ({ page }) 
 
   // 6. Verify: the same real test suite now passes with the patch applied.
   await page.getByRole("tab", { name: "Tests" }).click();
-  await page.getByRole("button", { name: "Run" }).click();
+  await page.getByRole("button", { name: "Run", exact: true }).click();
   await expect(result.getByText("Passed", { exact: true })).toBeVisible({ timeout: RUN_TIMEOUT });
   await expect(result.getByText("With patch applied")).toBeVisible();
   await expect(result.getByText(/fail 0/)).toBeVisible();

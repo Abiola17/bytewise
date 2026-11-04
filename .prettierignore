@@ -7,3 +7,6 @@ dist
 .next-e2e
 test-results
 playwright-report
+.vscode-test
+apps/vscode/dist
+examples

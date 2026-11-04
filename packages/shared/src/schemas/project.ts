@@ -43,3 +43,35 @@ export const availableProjectsResponseSchema = z.object({
   directories: z.array(z.string()),
 });
 export type AvailableProjectsResponse = z.infer<typeof availableProjectsResponseSchema>;
+
+/** Limits for importing a project from the browser (also enforced by the server). */
+export const IMPORT_LIMITS = {
+  maxFiles: 2000,
+  maxFileBytes: 1024 * 1024,
+  maxTotalBytes: 25 * 1024 * 1024,
+};
+
+export const importProjectRequestSchema = z.object({
+  /** Becomes the folder name inside the projects directory. */
+  name: createProjectRequestSchema.shape.directory,
+  files: z
+    .array(
+      z.object({
+        /** Path inside the project, e.g. `src/index.js`. Validated again on the server. */
+        path: z.string().min(1).max(1024),
+        /** Base64 file content. */
+        content: z.string(),
+      }),
+    )
+    .min(1)
+    .max(IMPORT_LIMITS.maxFiles),
+});
+export type ImportProjectRequest = z.infer<typeof importProjectRequestSchema>;
+
+export const importProjectResponseSchema = z.object({
+  project: projectSchema,
+  importedFiles: z.number().int(),
+  /** Files the server refused (first 50), with the reason. */
+  skipped: z.array(z.object({ path: z.string(), reason: z.string() })),
+});
+export type ImportProjectResponse = z.infer<typeof importProjectResponseSchema>;

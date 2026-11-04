@@ -17,7 +17,10 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "db:generate": "pnpm --filter @bytewise/server db:generate",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "ext:build": "pnpm --filter bytewise build",
+    "ext:test": "pnpm --filter bytewise test && pnpm --filter bytewise test:vscode",
+    "ext:package": "pnpm --filter bytewise package"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

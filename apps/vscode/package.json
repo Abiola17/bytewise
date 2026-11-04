@@ -1,0 +1,158 @@
+{
+  "name": "bytewise",
+  "displayName": "Bytewise",
+  "description": "A Meta-powered coding agent: diagnose bugs, review fixes, verify with real tests.",
+  "version": "0.1.0",
+  "publisher": "bytewise",
+  "private": true,
+  "license": "UNLICENSED",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "AI",
+    "Debuggers",
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "files": [
+    "dist/extension.js",
+    "dist/webview.js",
+    "media/**"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "bytewise",
+          "title": "Bytewise",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "bytewise": [
+        {
+          "type": "webview",
+          "id": "bytewise.chat",
+          "name": "Chat"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "bytewise.openChat",
+        "title": "Open Chat",
+        "category": "Bytewise",
+        "icon": "$(bug)"
+      },
+      {
+        "command": "bytewise.setApiKey",
+        "title": "Set Meta API Key",
+        "category": "Bytewise"
+      },
+      {
+        "command": "bytewise.clearApiKey",
+        "title": "Remove Meta API Key",
+        "category": "Bytewise"
+      },
+      {
+        "command": "bytewise.newChat",
+        "title": "New Chat",
+        "category": "Bytewise",
+        "icon": "$(add)"
+      },
+      {
+        "command": "bytewise.acceptEdit",
+        "title": "Accept Proposed Change",
+        "category": "Bytewise",
+        "icon": "$(check)"
+      },
+      {
+        "command": "bytewise.rejectEdit",
+        "title": "Reject Proposed Change",
+        "category": "Bytewise",
+        "icon": "$(close)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "bytewise.newChat",
+          "when": "view == bytewise.chat",
+          "group": "navigation"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "bytewise.acceptEdit",
+          "when": "resourceScheme == bytewise-review",
+          "group": "navigation@1"
+        },
+        {
+          "command": "bytewise.rejectEdit",
+          "when": "resourceScheme == bytewise-review",
+          "group": "navigation@2"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "bytewise.acceptEdit",
+          "when": "resourceScheme == bytewise-review"
+        },
+        {
+          "command": "bytewise.rejectEdit",
+          "when": "resourceScheme == bytewise-review"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Bytewise",
+      "properties": {
+        "bytewise.model": {
+          "type": "string",
+          "default": "muse-spark-1.3",
+          "description": "Meta model used by the agent. Avoid '-contributor' models: they allow Meta to train on your prompts, which include your code."
+        },
+        "bytewise.baseUrl": {
+          "type": "string",
+          "default": "https://api.meta.ai/v1",
+          "description": "Meta Model API base URL."
+        },
+        "bytewise.requestTimeoutSeconds": {
+          "type": "number",
+          "default": 120,
+          "minimum": 10,
+          "maximum": 600,
+          "description": "How long to wait for one model response."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:vscode": "node esbuild.mjs && node test/run-vscode-tests.mjs",
+    "package": "node esbuild.mjs --production && vsce package --no-dependencies --allow-missing-repository --skip-license -o dist/bytewise.vsix"
+  },
+  "dependencies": {
+    "@bytewise/shared": "workspace:*",
+    "zod": "^3.24.1",
+    "diff": "^7.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/vscode": "^1.90.0",
+    "@vscode/test-electron": "^2.4.1",
+    "@vscode/vsce": "^3.2.1",
+    "esbuild": "^0.24.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8",
+    "@types/diff": "^7.0.0"
+  }
+}

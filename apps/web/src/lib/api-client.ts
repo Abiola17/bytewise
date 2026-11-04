@@ -9,6 +9,7 @@ import {
   fileContentResponseSchema,
   fileListResponseSchema,
   healthResponseSchema,
+  importProjectResponseSchema,
   patchProposalSchema,
   projectListResponseSchema,
   projectSchema,
@@ -21,6 +22,7 @@ import {
   verificationRunSchema,
   type CreateProjectRequest,
   type CreateScreenshotRequest,
+  type ImportProjectRequest,
 } from "@bytewise/shared";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
@@ -85,6 +87,8 @@ export const api = {
   createProject: (body: CreateProjectRequest) =>
     request("/projects", projectSchema, { method: "POST", body }),
   listAvailableProjects: () => request("/projects/available", availableProjectsResponseSchema),
+  importProject: (body: ImportProjectRequest) =>
+    request("/projects/import", importProjectResponseSchema, { method: "POST", body }),
 
   listFiles: (projectId: string) =>
     request(`/projects/${encodeURIComponent(projectId)}/files`, fileListResponseSchema),

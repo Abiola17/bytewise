@@ -1,6 +1,9 @@
 import { z } from "zod";
 
 export const dashboardSummarySchema = z.object({
+  projects: z.number().int(),
+  /** Diagnoses of kind "diagnosis" (not clarifying questions). */
+  diagnoses: z.number().int(),
   sessions: z.object({
     total: z.number().int(),
     /** Sessions whose latest state is a fix verified by a passing run with the patch applied. */

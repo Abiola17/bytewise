@@ -13,6 +13,7 @@ import { EvidenceCard } from "@/components/evidence/evidence-card";
 import { PatchPanel, type PatchAction } from "@/components/patches/patch-panel";
 import { VerificationPanel } from "@/components/verification/verification-panel";
 import { ScreenshotPanel } from "@/components/screenshots/screenshot-panel";
+import { NextStep, type SessionTab } from "@/components/session/next-step";
 
 const STATUS_LABEL: Record<SessionDetail["session"]["status"], string> = {
   open: "Open",
@@ -25,7 +26,7 @@ const STATUS_LABEL: Record<SessionDetail["session"]["status"], string> = {
   closed: "Closed",
 };
 
-type Tab = "diagnosis" | "patch" | "tests" | "evidence";
+type Tab = SessionTab;
 const TABS: Tab[] = ["diagnosis", "patch", "tests", "evidence"];
 const TAB_LABEL: Record<Tab, string> = {
   diagnosis: "Diagnosis",
@@ -179,6 +180,7 @@ export function SessionWorkspace({ sessionId }: { sessionId: string }) {
           {STATUS_LABEL[detail.session.status]}
         </Badge>
       </header>
+      <NextStep detail={detail} onGoTo={setTab} />
 
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(400px,520px)]">
         <section className="flex min-h-[480px] flex-col lg:border-r">

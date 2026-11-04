@@ -12,3 +12,5 @@ apps/web/next-env.d.ts
 .next-e2e/
 test-results/
 playwright-report/
+.vscode-test/
+apps/vscode/dist/

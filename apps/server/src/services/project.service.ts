@@ -8,11 +8,32 @@ import {
   type ProjectMetadata,
 } from "@bytewise/shared";
 import { badRequest, conflict, notFound } from "../errors/app-error";
+import { isExcludedDirectory } from "../filesystem/path-policy";
 import { resolveProjectRoot } from "../filesystem/project-root";
 import type { ProjectsRepository } from "../repositories/projects.repository";
 import type { ProjectRow } from "../database/schema";
 
 const MAX_PACKAGE_JSON_BYTES = 256 * 1024;
+
+/**
+ * For projects without package.json (e.g. a static site): look at file
+ * extensions in the top two folder levels, skipping excluded folders.
+ */
+function languageFromFiles(root: string): string {
+  const names: string[] = [];
+  for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
+    if (entry.isFile()) names.push(entry.name);
+    else if (entry.isDirectory() && !isExcludedDirectory(entry.name)) {
+      for (const child of fs.readdirSync(path.join(root, entry.name), { withFileTypes: true })) {
+        if (child.isFile()) names.push(child.name);
+      }
+    }
+    if (names.length > 500) break;
+  }
+  if (names.some((n) => /\.(ts|tsx|mts|cts)$/.test(n))) return "typescript";
+  if (names.some((n) => /\.(js|jsx|mjs|cjs|html?)$/.test(n))) return "javascript";
+  return "unknown";
+}
 
 export function createProjectService(deps: { projects: ProjectsRepository; projectsDir: string }) {
   const { projects, projectsDir } = deps;
@@ -41,7 +62,11 @@ export function createProjectService(deps: { projects: ProjectsRepository; proje
 
     const hasTypeScript =
       hasTypeScriptDependency || fs.existsSync(path.join(root, "tsconfig.json"));
-    const language = hasTypeScript ? "typescript" : packageName !== null ? "javascript" : "unknown";
+    const language = hasTypeScript
+      ? "typescript"
+      : packageName !== null
+        ? "javascript"
+        : languageFromFiles(root);
 
     return {
       metadata: projectMetadataSchema.parse({ packageName, hasTypeScript, scripts }),

@@ -19,6 +19,7 @@ describe("dashboard API", () => {
       (await ctx.app.inject({ method: "GET", url: "/api/v1/dashboard/summary" })).json(),
     );
     expect(summary.sessions).toEqual({ total: 0, fixVerified: 0 });
+    expect(summary).toMatchObject({ projects: 0, diagnoses: 0 });
     expect(summary.verificationRuns.total).toBe(0);
     expect(summary.recentActivity).toEqual([]);
 
@@ -109,6 +110,7 @@ describe("dashboard aggregation", () => {
   it("counts sessions and runs from stored records", () => {
     const summary = createDashboardService({ db: handle.db }).summary();
     expect(summary.sessions).toEqual({ total: 2, fixVerified: 1 });
+    expect(summary).toMatchObject({ projects: 1, diagnoses: 0 });
     expect(summary.verificationRuns).toEqual({
       total: 6,
       passed: 2,

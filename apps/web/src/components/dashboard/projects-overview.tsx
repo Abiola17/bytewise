@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { AlertCircle, ChevronRight, FolderGit2, Loader2, Plus } from "lucide-react";
+import { AlertCircle, ChevronRight, FolderGit2, Loader2, Plus, RefreshCw } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { useApi } from "@/hooks/use-api";
 import { Badge } from "@/components/ui/badge";
@@ -53,6 +53,11 @@ export function ProjectsOverview() {
           </div>
         )}
         {projects.state.status === "success" && projects.state.data.projects.length > 0 && (
+          <p className="text-xs text-muted-foreground">
+            Already registered — click a project to open it.
+          </p>
+        )}
+        {projects.state.status === "success" && projects.state.data.projects.length > 0 && (
           <ul className="divide-y">
             {projects.state.data.projects.map((project) => (
               <li key={project.id}>
@@ -63,7 +68,8 @@ export function ProjectsOverview() {
                   <span className="truncate font-medium">{project.name}</span>
                   <span className="flex items-center gap-2">
                     <Badge variant="outline">{project.language}</Badge>
-                    <ChevronRight className="size-4 text-muted-foreground" aria-hidden />
+                    <span className="text-xs text-primary">Open</span>
+                    <ChevronRight className="size-4 text-primary" aria-hidden />
                   </span>
                 </Link>
               </li>
@@ -96,6 +102,20 @@ export function ProjectsOverview() {
                 </li>
               ))}
             </ul>
+          </div>
+        )}
+        {available.state.status === "success" && available.state.data.directories.length === 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4 text-xs text-muted-foreground">
+            <p className="min-w-0 flex-1">
+              To add another project,{" "}
+              <Link href="/projects" className="text-primary hover:underline">
+                import it from your computer
+              </Link>{" "}
+              (folder or .zip) on the Projects page.
+            </p>
+            <Button size="sm" variant="ghost" onClick={available.reload}>
+              <RefreshCw aria-hidden /> Check again
+            </Button>
           </div>
         )}
         {registerError && (

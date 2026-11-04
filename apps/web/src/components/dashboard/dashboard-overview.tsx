@@ -5,6 +5,7 @@ import { AlertCircle, FlaskConical, Loader2 } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { useApi } from "@/hooks/use-api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { GettingStarted } from "@/components/guide/getting-started";
 import { RecentActivity } from "./recent-activity";
 import { SummaryCards } from "./summary-cards";
 import { TestOutcomesChart } from "./test-outcomes-chart";
@@ -35,7 +36,12 @@ export function DashboardOverview() {
     <div className="space-y-6">
       {summary.state.status === "loading" && <Loading what="metrics" />}
       {summary.state.status === "error" && <Failure message={summary.state.message} />}
-      {summary.state.status === "success" && <SummaryCards summary={summary.state.data} />}
+      {summary.state.status === "success" && (
+        <>
+          <GettingStarted summary={summary.state.data} />
+          <SummaryCards summary={summary.state.data} />
+        </>
+      )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <Card>

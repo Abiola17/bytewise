@@ -20,6 +20,7 @@ import { createPatchesRepository } from "./repositories/patches.repository";
 import { createVerificationsRepository } from "./repositories/verifications.repository";
 import { createProjectService } from "./services/project.service";
 import { createProjectFilesService } from "./services/project-files.service";
+import { createProjectImportService } from "./services/project-import.service";
 import { createSessionService } from "./services/session.service";
 import { createDiagnosisService } from "./services/diagnosis.service";
 import { createDebuggingService } from "./services/debugging.service";
@@ -134,7 +135,15 @@ export async function buildApp(
   await app.register(
     async (api) => {
       await api.register(healthRoutes({ config, pingDatabase: database.ping }));
-      await api.register(projectRoutes({ projectService }));
+      await api.register(
+        projectRoutes({
+          projectService,
+          projectImport: createProjectImportService({
+            projectService,
+            projectsDir: config.projectsDir,
+          }),
+        }),
+      );
       await api.register(fileRoutes({ projectFiles }));
       await api.register(sessionRoutes({ sessionService, debuggingService }));
       await api.register(patchRoutes({ patchService }));

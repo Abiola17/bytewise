@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { Bug, FolderGit2, History, LayoutDashboard } from "lucide-react";
+import { BookOpen, Bug, FolderGit2, History, LayoutDashboard } from "lucide-react";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard, enabled: true },
   { href: "/projects", label: "Projects", icon: FolderGit2, enabled: true },
   { href: "/sessions", label: "Sessions", icon: History, enabled: true },
+  { href: "/guide", label: "Guide", icon: BookOpen, enabled: true },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -15,7 +16,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Bug className="size-5 text-primary" aria-hidden />
           Bytewise
         </div>
-        <nav aria-label="Main" className="flex gap-1 px-2 pb-2 md:flex-col md:pb-0">
+        <nav
+          aria-label="Main"
+          className="flex flex-wrap gap-1 px-2 pb-2 md:flex-col md:flex-nowrap md:pb-0"
+        >
           {navItems.map(({ href, label, icon: Icon, enabled }) =>
             enabled ? (
               <Link

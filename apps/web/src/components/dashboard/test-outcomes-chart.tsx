@@ -62,6 +62,10 @@ export function TestOutcomesChart({ data }: { data: TestOutcomes }) {
     return { ...d, label: dayLabel(d.date), notPassed, down: -notPassed };
   });
   const max = Math.max(1, ...rows.map((r) => Math.max(r.passed, r.notPassed)));
+  // Symmetric integer ticks around the baseline, so "above" and "below" read the same.
+  const half = Math.round(max / 2);
+  const ticks =
+    max >= 4 ? [-max, -half, 0, half, max] : Array.from({ length: 2 * max + 1 }, (_, i) => i - max);
 
   return (
     <div className="space-y-3">
@@ -107,6 +111,7 @@ export function TestOutcomesChart({ data }: { data: TestOutcomes }) {
               <YAxis
                 allowDecimals={false}
                 domain={[-max, max]}
+                ticks={ticks}
                 tickFormatter={(v: number) => String(Math.abs(v))}
                 tickLine={false}
                 axisLine={false}

@@ -11,6 +11,8 @@ Product brief and phase plan: `implementation.md`. Read the relevant phase befor
 
 ## Structure
 
+- `apps/vscode` — **the current focus**: the Bytewise VS Code extension (see `implementation.md` §19A). Extension host code in `src/` (no VS Code imports in `meta/` and `chat-session.ts`, so they unit-test with Vitest); the chat webview in `src/webview/` renders model text via DOM nodes only (never innerHTML) under a strict CSP. The Meta key lives in `context.secrets` and never reaches the webview. Commands: `pnpm ext:build`, `pnpm ext:test` (unit + real VS Code smoke test), `pnpm ext:package` (→ `apps/vscode/dist/bytewise.vsix`). F5 → “Run Bytewise Extension”.
+
 - `apps/server` — Fastify, TypeScript only. Layers: `routes/` (HTTP + Zod parsing only) → `services/` (logic) → `repositories/` (Drizzle). Errors are thrown as `AppError` and mapped to the shared `ApiError` body.
 - `apps/web` — Next.js App Router. All backend calls go through `src/lib/api-client.ts`, which validates responses with shared schemas.
 - `packages/shared` — Zod schemas = the API contract. Change the contract here first. Use extensionless relative imports (Next.js cannot resolve `.js` → `.ts`).

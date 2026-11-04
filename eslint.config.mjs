@@ -16,6 +16,10 @@ export default tseslint.config(
       "**/next-env.d.ts",
       "apps/server/src/database/migrations/**",
       "examples/**",
+      "e2e/fixtures/**",
+      "**/.data/**",
+      "**/.vscode-test/**",
+      "apps/vscode/dist/**",
     ],
   },
   js.configs.recommended,
@@ -30,7 +34,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ["apps/web/**/*.{ts,tsx}"],
+    files: ["apps/web/**/*.{ts,tsx}", "apps/vscode/src/webview/**/*.ts"],
     languageOptions: {
       globals: { ...globals.browser },
     },

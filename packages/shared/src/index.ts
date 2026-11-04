@@ -9,3 +9,4 @@ export * from "./schemas/patch";
 export * from "./schemas/verification";
 export * from "./schemas/dashboard";
 export * from "./schemas/media";
+export * from "./path-policy";
