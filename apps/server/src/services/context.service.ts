@@ -114,6 +114,25 @@ function excerpt(file: SearchableFile, startLine: number, endLine: number): stri
   return file.lines.slice(startLine - 1, endLine).join("\n");
 }
 
+/**
+ * Line range of the root package.json "scripts" block: how the project is
+ * run, built and tested. Bounded so a malformed file cannot pull in everything.
+ */
+export function scriptsBlock(file: SearchableFile): [number, number] | null {
+  const start = file.lines.findIndex((l) => /^\s*"scripts"\s*:\s*\{/.test(l));
+  if (start < 0) return null;
+  const limit = Math.min(file.lines.length, start + CONTEXT_BUDGET.maxExcerptLines);
+  let depth = 0;
+  for (let i = start; i < limit; i++) {
+    for (const ch of file.lines[i]!) {
+      if (ch === "{") depth++;
+      else if (ch === "}") depth--;
+    }
+    if (depth <= 0) return [start + 1, i + 1];
+  }
+  return [start + 1, limit];
+}
+
 interface Window {
   start: number;
   end: number;
@@ -337,6 +356,12 @@ export function buildEvidence(files: SearchableFile[], query: string): EvidenceR
     }
   }
 
+  // The package.json scripts block (step 6) is reserved before code evidence is budgeted.
+  const pkg = byPath.get("package.json");
+  const scripts = pkg ? scriptsBlock(pkg) : null;
+  const scriptsText = pkg && scripts ? excerpt(pkg, scripts[0], scripts[1]) : "";
+  const charLimit = CONTEXT_BUDGET.maxTotalChars - scriptsText.length;
+
   // 5. Apply the budget: highest score first, within item and character limits.
   deduped.sort((a, b) => b.score - a.score);
   const evidence: EvidenceItem[] = [];
@@ -345,13 +370,38 @@ export function buildEvidence(files: SearchableFile[], query: string): EvidenceR
   for (const item of deduped) {
     if (
       evidence.length >= CONTEXT_BUDGET.maxItems ||
-      usedChars + item.excerpt.length > CONTEXT_BUDGET.maxTotalChars
+      usedChars + item.excerpt.length > charLimit
     ) {
       droppedItems++;
       continue;
     }
     evidence.push({ ...item, score: Math.round(item.score * 100) / 100 });
     usedChars += item.excerpt.length;
+  }
+
+  // 6. The project's own scripts answer "how do I run / build / test this?" and
+  //    give every diagnosis the real commands. It is small, so it is added on
+  //    top of the item budget rather than displacing code evidence; its
+  //    characters were reserved above.
+  if (
+    pkg &&
+    scripts &&
+    !evidence.some(
+      (e) => e.relativePath === pkg.path && e.startLine <= scripts[0] && e.endLine >= scripts[1],
+    )
+  ) {
+    const text = scriptsText;
+    evidence.push({
+      id: evidenceId(pkg.path, scripts[0], scripts[1], text),
+      sourceType: "config_file",
+      relativePath: pkg.path,
+      startLine: scripts[0],
+      endLine: scripts[1],
+      excerpt: text,
+      reason: "The project's package.json scripts: how it is run, built and tested.",
+      score: 0,
+    });
+    usedChars += text.length;
   }
 
   return {

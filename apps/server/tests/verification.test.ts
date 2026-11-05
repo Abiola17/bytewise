@@ -172,7 +172,7 @@ describe("verification runs", () => {
     expect((await detail(sessionId)).session.status).toBe("verification_failed");
   });
 
-  it.each(["start", "deploy", "typecheck", "test && rm -rf /"])(
+  it.each(["start", "dev", "deploy", "typecheck", "test && rm -rf /"])(
     "records %j as blocked without running anything",
     async (script) => {
       const { sessionId } = await setup();
