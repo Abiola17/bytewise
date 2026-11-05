@@ -1,11 +1,57 @@
 import type { ChatEntry } from "./protocol";
 import { agentSystemPrompt, runAgentTurn } from "./agent/agent";
+import type { RunLimits } from "@bytewise/execution";
 import type { EditHost } from "./agent/edit-tools";
+import { dataUrl, type ImageAttachment } from "./agent/images";
+import { attachMentions, messageWithAttachments } from "./agent/mentions";
+import type { RunHost } from "./agent/run-tools";
 import type { WorkspaceFs } from "./agent/workspace-fs";
 import { MetaApiError, type ChatMessage, type MetaClient } from "./meta/meta-client";
 
 /** Older turns are dropped first; the system prompt is always sent. */
 const MAX_HISTORY_MESSAGES = 60;
+
+/** What is saved between VS Code sessions. */
+export interface ChatSnapshot {
+  version: 1;
+  history: ChatMessage[];
+  entries: ChatEntry[];
+}
+
+const MAX_SNAPSHOT_ENTRIES = 300;
+
+/**
+ * Restored conversations cannot resume work that was in flight: anything that
+ * was waiting or running is shown as interrupted, never as still pending.
+ */
+export function normalizeRestoredEntries(entries: ChatEntry[]): ChatEntry[] {
+  return entries.map((e) => {
+    if (e.role === "approval" && e.status === "pending") {
+      return { ...e, status: "rejected", reason: "VS Code was closed before a decision." };
+    }
+    if (e.role === "run" && (e.status === "pending" || e.status === "running")) {
+      return {
+        ...e,
+        status: e.status === "pending" ? "skipped" : "cancelled",
+        errorMessage: "Interrupted when VS Code was closed.",
+      };
+    }
+    if (e.role === "step" && e.status === "running")
+      return { ...e, status: "error", summary: `${e.summary} (interrupted)` };
+    return e;
+  });
+}
+
+/** Replaces image parts with a short note, so saved history never stores image data. */
+export function withoutImages(message: ChatMessage): ChatMessage {
+  if (!Array.isArray(message.content)) return message;
+  const text = message.content
+    .map((p) =>
+      p.type === "text" ? p.text : "[an image was attached here; it is not kept after a restart]",
+    )
+    .join("\n");
+  return { ...message, content: text };
+}
 
 export function chatOnlyPrompt(): string {
   return [
@@ -32,6 +78,8 @@ export function createChatSession(deps: {
   newId: () => string;
   /** Approval host for edits; when absent the agent is read-only. */
   editHost?: () => EditHost | null;
+  /** Approval host for running scripts; when absent nothing can run. */
+  run?: () => { host: RunHost; cwd: string | null; limits: RunLimits } | null;
 }) {
   let history: ChatMessage[] = [];
   let entries: ChatEntry[] = [];
@@ -58,6 +106,30 @@ export function createChatSession(deps: {
       entries = [];
     },
 
+    /** The conversation to save. Only whole turns are kept in history. */
+    snapshot(): ChatSnapshot {
+      return {
+        version: 1,
+        // Images are not saved: only their names, so the stored chat stays small.
+        history: trimHistory(history).map(withoutImages),
+        entries: entries.slice(-MAX_SNAPSHOT_ENTRIES),
+      };
+    },
+
+    restore(saved: unknown) {
+      const snap = saved as Partial<ChatSnapshot> | undefined;
+      if (
+        !snap ||
+        snap.version !== 1 ||
+        !Array.isArray(snap.history) ||
+        !Array.isArray(snap.entries)
+      ) {
+        return;
+      }
+      history = trimHistory(snap.history);
+      entries = normalizeRestoredEntries(snap.entries);
+    },
+
     stop() {
       controller?.abort();
     },
@@ -76,16 +148,61 @@ export function createChatSession(deps: {
       text: string,
       onEntry: (entry: ChatEntry) => void,
       onStatus: (label: string) => void = () => {},
+      options: { images?: ImageAttachment[]; spoken?: boolean } = {},
     ): Promise<void> {
-      const trimmed = text.trim();
+      const images = options.images ?? [];
+      const trimmed = text.trim() || (images.length ? "Please look at the attached image." : "");
       if (!trimmed || busy) return;
       busy = true;
       controller = new AbortController();
-      upsert({ id: deps.newId(), role: "user", text: trimmed }, onEntry);
-      const userMessage: ChatMessage = { role: "user", content: trimmed };
+      upsert(
+        {
+          id: deps.newId(),
+          role: "user",
+          text: trimmed,
+          ...(images.length ? { attachments: images.map((i) => i.name) } : {}),
+          ...(options.spoken ? { spoken: true } : {}),
+        },
+        onEntry,
+      );
+      let userMessage: ChatMessage = { role: "user", content: trimmed };
 
       try {
         const fs = deps.workspace();
+        if (fs) {
+          // @file mentions: attach the files' content to what the model receives.
+          const attached = await attachMentions(fs, trimmed);
+          for (const { mention, outcome } of attached) {
+            upsert(
+              {
+                id: deps.newId(),
+                role: "step",
+                tool: "attach",
+                status: outcome.ok ? "done" : "error",
+                summary: outcome.ok
+                  ? outcome.summary.replace(/^Read /, "Attached ")
+                  : `Could not attach ${mention.path}: ${outcome.output}`,
+                path: outcome.ok ? outcome.path : undefined,
+                line: outcome.line,
+              },
+              onEntry,
+            );
+          }
+          userMessage = { role: "user", content: messageWithAttachments(trimmed, attached) };
+        }
+        if (images.length) {
+          // The model receives the images with the text (verified with muse-spark-1.3).
+          userMessage = {
+            role: "user",
+            content: [
+              { type: "text", text: userMessage.content as string },
+              ...images.map((image) => ({
+                type: "image_url" as const,
+                image_url: { url: dataUrl(image) },
+              })),
+            ],
+          };
+        }
         if (!fs) {
           onStatus("Thinking…");
           const result = await deps.client().chat({
@@ -103,12 +220,19 @@ export function createChatSession(deps: {
         }
 
         const editHost = deps.editHost?.() ?? undefined;
+        const run = deps.run?.() ?? undefined;
         const turn = await runAgentTurn({
           editHost,
+          run,
           client: deps.client(),
           fs,
           history: trimHistory([...history, userMessage]),
-          systemPrompt: agentSystemPrompt(fs.rootName, deps.editorContext(), Boolean(editHost)),
+          systemPrompt: agentSystemPrompt(
+            fs.rootName,
+            deps.editorContext(),
+            Boolean(editHost),
+            Boolean(run),
+          ),
           signal: controller.signal,
           newId: deps.newId,
           callbacks: {

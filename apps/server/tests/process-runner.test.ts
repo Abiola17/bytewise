@@ -126,3 +126,28 @@ describe("command policy", () => {
     expect(res).toMatchObject({ allowed: true, command: { file: "pnpm", args: ["run", "test"] } });
   });
 });
+
+describe("runProcess cancellation", () => {
+  it("kills the process tree when the signal aborts, and never reports it as a test result", async () => {
+    const controller = new AbortController();
+    const started = Date.now();
+    const run = runProcess(
+      process.execPath,
+      [
+        "-e",
+        "require('child_process').spawn(process.execPath, ['-e', 'setInterval(()=>{},1000)'], { stdio: 'inherit' }); setInterval(()=>{}, 1000)",
+      ],
+      {
+        cwd: os.tmpdir(),
+        limits: { timeoutMs: 20_000, maxOutputChars: 1000, killGraceMs: 300 },
+        signal: controller.signal,
+      },
+    );
+    setTimeout(() => controller.abort(), 300);
+    const result = await run;
+    expect(result.outcome).toBe("cancelled");
+    expect(result.errorMessage).toMatch(/Stopped/);
+    expect(statusFor(result)).toBe("error");
+    expect(Date.now() - started).toBeLessThan(5000);
+  });
+});

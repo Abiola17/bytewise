@@ -5,7 +5,9 @@ import * as vscode from "vscode";
 import { runTool } from "../../src/agent/tools";
 import type { EditProposal } from "../../src/agent/edit-tools";
 import { createVscodeWorkspaceFs } from "../../src/agent/vscode-workspace-fs";
+import { runScriptTool } from "../../src/agent/run-tools";
 import { REVIEW_SCHEME, type EditManager } from "../../src/edit-manager";
+import type { RunManager } from "../../src/run-manager";
 
 export async function run(): Promise<void> {
   const extension = vscode.extensions.getExtension("bytewise.bytewise");
@@ -22,6 +24,8 @@ export async function run(): Promise<void> {
     "bytewise.setApiKey",
     "bytewise.clearApiKey",
     "bytewise.newChat",
+    "bytewise.viewHistory",
+    "bytewise.transcribeVoice",
   ]) {
     assert.ok(commands.includes(id), `command ${id} is registered`);
   }
@@ -73,7 +77,28 @@ export async function run(): Promise<void> {
   );
   await vscode.commands.executeCommand("workbench.action.files.revert");
 
+  // @-mentions offer only files the agent may read.
+  const exportsApi = extension.exports as {
+    listMentionableFiles(): Promise<string[]>;
+    lastInsertedText(): string | null;
+  };
+  const mentionable = await exportsApi.listMentionableFiles();
+  assert.ok(mentionable.includes("src/session.js"), "source files can be mentioned");
+  for (const hidden of [".env", "node_modules/lib/index.js", "linkdir/outside.js"]) {
+    assert.ok(!mentionable.includes(hidden), `${hidden} is not offered for @-mentions`);
+  }
+
+  // "Ask Bytewise About Selection" puts a mention of the selected lines in the box.
+  const selDoc = await vscode.workspace.openTextDocument(
+    vscode.Uri.joinPath(folder.uri, "src/session.js"),
+  );
+  const selEditor = await vscode.window.showTextDocument(selDoc);
+  selEditor.selection = new vscode.Selection(0, 0, 0, 10);
+  await vscode.commands.executeCommand("bytewise.askAboutSelection");
+  assert.equal(exportsApi.lastInsertedText(), "@src/session.js:1-1 ");
+
   await reviewFlow(folder, (extension.exports as { edits: EditManager }).edits);
+  await runFlow(folder, (extension.exports as { runs: RunManager }).runs);
 
   console.log("Bytewise VS Code smoke test passed.");
 }
@@ -172,4 +197,44 @@ async function reviewFlow(folder: vscode.WorkspaceFolder, edits: EditManager) {
   await waitFor(() => reviewTabs().length === 1, "a pending review opens");
   edits.rejectAll("Stopped.");
   assert.equal((await pending).decision, "rejected");
+}
+
+/** A real script run in the open workspace, approved through the RunManager. */
+async function runFlow(folder: vscode.WorkspaceFolder, runs: RunManager) {
+  const limits = { timeoutMs: 30_000, maxOutputChars: 10_000, killGraceMs: 500 };
+  const call = (script: string) =>
+    runScriptTool({
+      cwd: folder.uri.fsPath,
+      host: runs,
+      rawArguments: JSON.stringify({ script, reason: "smoke" }),
+      newId: () => `run-${script}-${Math.random()}`,
+      limits,
+    });
+
+  // Approve: the panel would send decideRun; do the same.
+  const original = runs.requestRun.bind(runs);
+  runs.requestRun = (req) => {
+    const p = original(req);
+    setTimeout(() => runs.decide(req.id, "run"), 50);
+    return p;
+  };
+  const passed = await call("test");
+  assert.ok(passed.ok, "the approved test script runs and passes");
+  assert.match(passed.output, /npm run test → PASSED/);
+  assert.match(passed.output, /smoke ok/);
+
+  // Skip: nothing runs.
+  runs.requestRun = (req) => {
+    const p = original(req);
+    setTimeout(() => runs.decide(req.id, "skip"), 50);
+    return p;
+  };
+  const skipped = await call("test");
+  assert.match(skipped.output, /chose not to run/);
+
+  // Not allowed by the policy: refused before asking.
+  const refused = await call("deploy");
+  assert.equal(refused.ok, false);
+  assert.match(refused.output, /not an allowed verification script/);
+  runs.requestRun = original;
 }

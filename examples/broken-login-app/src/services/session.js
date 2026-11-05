@@ -11,6 +11,6 @@ export function createSessionToken(user) {
     }),
   ).toString("base64url");
 
-  const signature = createHmac("sha256", config.sessionSecret).update(payload).digest("base64url");
+  const signature = createHmac("sha256", config.secret).update(payload).digest("base64url");
   return `${payload}.${signature}`;
 }
