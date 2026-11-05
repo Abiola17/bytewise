@@ -93,7 +93,7 @@ export function ImportProject() {
       notes.push(
         prepared.nestedPackageRoots.length > 0
           ? "There is no package.json at the top level, but a subfolder has one. If that subfolder is the actual app, use it as the root below."
-          : "No package.json found, so the Tests tab will have nothing to run. You can still describe bugs, get diagnoses and apply fixes.",
+          : "No package.json found, so there are no test scripts to run. You can still describe bugs, get diagnoses and apply fixes.",
       );
     }
   }

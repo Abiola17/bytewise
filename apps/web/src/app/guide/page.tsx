@@ -23,22 +23,22 @@ const STEPS = [
       "Click Register next to broken-login-app, then click its name to open it.",
       "Already in the list (no Register button)? It is registered already — just click it.",
       "To debug your own code instead, use Import a project at the top of the Projects page.",
-      "The project page shows its files (secrets and dependencies are hidden) and a read-only code viewer.",
+      "The project opens in the Bytewise IDE: files on the left (secrets and dependencies are hidden), a read-only editor in the middle and the chat on the right.",
     ],
   },
   {
     icon: MessageSquare,
-    title: "Start a debugging session",
-    where: "Project page → New debugging session (top right)",
+    title: "Start a chat",
+    where: "IDE → chat on the right",
     body: [
-      "The session page has a chat on the left and four tabs on the right: Diagnosis, Patch, Tests and Evidence.",
-      "A Next step bar under the title always tells you what to do.",
+      "A chat starts when you send your first message or run a script. Diagnoses, proposed changes and test runs all appear in it, in order.",
+      "Use New chat (top right) to start over, and History to return to an earlier chat.",
     ],
   },
   {
     icon: FlaskConical,
     title: "Run the tests first",
-    where: "Tests tab → Run",
+    where: "Terminal (bottom panel) → test",
     body: [
       "The result shows Failed — the bug is real. The real output appears below it.",
       "That output is also given to the AI as evidence.",
@@ -47,7 +47,7 @@ const STEPS = [
   {
     icon: Mic,
     title: "Describe the bug",
-    where: "Chat box → send (or ⌘/Ctrl + Enter)",
+    where: "Chat box → send (or Enter)",
     body: [
       'For example: "The login endpoint returns a 500 error when a user submits valid credentials."',
       "Or click the microphone, speak, and click it again. Your words appear in the box for you to check — they are not sent until you press send.",
@@ -57,25 +57,25 @@ const STEPS = [
   {
     icon: Lightbulb,
     title: "Read the diagnosis",
-    where: "Diagnosis tab",
+    where: "Diagnosis card in the chat",
     body: [
-      "Likely cause, suggested fix, the evidence it is based on (click to see the code), and what it is unsure about.",
+      "Likely cause, suggested fix, the evidence it is based on (click to open the exact lines in the editor), and what it is unsure about.",
       "It is labelled AI hypothesis · not verified: an informed guess, not a proven fact. If the AI needs more detail it asks questions — answer them in the chat.",
     ],
   },
   {
     icon: FileDiff,
     title: "Review and apply the fix",
-    where: "Patch tab → Propose a fix",
+    where: "Chat → Propose a fix",
     body: [
-      "You see which files would change and a before/after view. Proposing changes nothing.",
-      "Apply patch → Confirm and apply writes the change. Reject patch discards it.",
+      "The diff opens in the editor and the chat shows which files would change. Proposing changes nothing.",
+      "Accept and apply writes the change. Reject discards it.",
     ],
   },
   {
     icon: CheckCircle2,
     title: "Verify",
-    where: "Tests tab → Run",
+    where: "Chat → Verify the fix → Run",
     body: [
       "Passed (with patch applied) means the fix works, and the session shows Fix verified.",
       "If it fails, click Diagnose this failure and continue from the diagnosis.",
@@ -84,7 +84,7 @@ const STEPS = [
   {
     icon: Undo2,
     title: "Reset the demo",
-    where: "Patch tab → Revert patch",
+    where: "Proposed change card → Revert patch",
     body: ["Restores the original code, bug included, so you can run the demo again."],
   },
 ];
@@ -173,7 +173,7 @@ export default function GuidePage() {
           <ImagePlus className="size-5" aria-hidden /> Adding a screenshot (optional)
         </h2>
         <p className="text-sm text-muted-foreground">
-          In a session, open the Evidence tab → Add a screenshot of the bug. Choose an image, type a
+          In a chat, click the image button in the message box (or the Evidence view) → Add a screenshot of the bug. Choose an image, type a
           concrete noun such as <em>button</em> or <em>text box</em>, and click Find regions with
           SAM 3.1. The matching areas are outlined and added to the evidence for the next diagnosis.
         </p>
@@ -188,7 +188,7 @@ export default function GuidePage() {
           .zip), check the preview and click Import project. Bytewise copies it in as a new project;
           your original files are not changed. A <code className="font-mono">package.json</code> is
           optional — without one (e.g. a plain HTML/CSS/JS site) you can still diagnose and fix; it
-          is only needed, with a <code className="font-mono">test</code> script, for the Tests tab.
+          is only needed, with a <code className="font-mono">test</code> script, to run tests.
           If it lives in a subfolder, the preview offers to use that folder as the root.
           Dependencies (node_modules), secrets such as <code className="font-mono">.env</code> and
           files over 1 MB are left out.
