@@ -63,6 +63,15 @@ describe("POST /projects/:id/evidence on the demo app", () => {
     expect(paths).toContain("src/config.js");
   });
 
+  it("always includes the package.json scripts, so run questions are answerable", async () => {
+    const result = await evidenceFor("How do I view this project?");
+    const scripts = result.evidence.find(
+      (e) => e.relativePath === "package.json" && e.excerpt.includes('"scripts"'),
+    );
+    expect(scripts).toBeDefined();
+    expect(scripts!.excerpt).toContain('"test"');
+  });
+
   it("puts stack-trace locations first", async () => {
     const result = await evidenceFor(
       "TypeError [ERR_INVALID_ARG_TYPE]: Received undefined\n" +
@@ -81,7 +90,10 @@ describe("POST /projects/:id/evidence on the demo app", () => {
 
   it("returns excerpts that match the real file contents and respects the budget", async () => {
     const result = await evidenceFor("login session token config secret user password");
-    expect(result.evidence.length).toBeLessThanOrEqual(CONTEXT_BUDGET.maxItems);
+    // Code evidence fills at most maxItems; the small package.json scripts block rides on top.
+    const code = result.evidence.filter((e) => !e.reason.startsWith("The project's package.json scripts"));
+    expect(code.length).toBeLessThanOrEqual(CONTEXT_BUDGET.maxItems);
+    expect(result.evidence.length - code.length).toBeLessThanOrEqual(1);
     expect(result.budget.usedChars).toBeLessThanOrEqual(CONTEXT_BUDGET.maxTotalChars);
 
     for (const item of result.evidence) {

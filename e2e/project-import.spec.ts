@@ -19,9 +19,8 @@ test("imports a project folder from the computer and runs its tests", async ({ p
   await expect(files.getByText("math.js")).toBeVisible();
 
   // The imported project's own test script runs for real.
-  await page.getByRole("button", { name: "New debugging session" }).click();
-  await page.getByRole("tab", { name: "Tests" }).click();
-  await page.getByRole("button", { name: "Run", exact: true }).click();
+  await page.getByRole("button", { name: "Toggle terminal" }).click();
+  await page.getByRole("button", { name: "Run test", exact: true }).click();
   const result = page.getByRole("region", { name: "Verification result" });
   await expect(result.getByText("Passed", { exact: true })).toBeVisible({ timeout: 60_000 });
 });

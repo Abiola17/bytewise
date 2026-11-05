@@ -17,19 +17,26 @@ test.use({
   },
 });
 
-async function openSession(page: Page) {
+async function openProject(page: Page) {
   await page.goto("/projects");
   const register = page.locator("li", { hasText: "broken-login-app" }).getByRole("button", {
     name: "Register",
   });
   if (await register.isVisible().catch(() => false)) await register.click();
   await page.getByRole("link", { name: /broken-login-app/ }).click();
-  await page.getByRole("button", { name: "New debugging session" }).click();
+  await expect(page.getByLabel("Message")).toBeVisible();
+}
+
+/** Screenshots belong to a chat; running the test script starts one without the model. */
+async function openSession(page: Page) {
+  await openProject(page);
+  await page.getByRole("button", { name: "Toggle terminal" }).click();
+  await page.getByRole("button", { name: "Run test", exact: true }).click();
   await expect(page).toHaveURL(/\/sessions\/[\w-]+$/);
 }
 
 test("dictates a bug report into the message box without sending it", async ({ page }) => {
-  await openSession(page);
+  await openProject(page);
 
   await page.getByRole("button", { name: "Dictate with voice" }).click();
   await expect(page.getByRole("button", { name: /Stop recording/ })).toBeVisible();
@@ -46,7 +53,7 @@ test("dictates a bug report into the message box without sending it", async ({ p
 test("highlights screenshot regions with SAM and records them as evidence", async ({ page }) => {
   await openSession(page);
 
-  await page.getByRole("tab", { name: /Evidence/ }).click();
+  await page.getByRole("button", { name: "Add a screenshot" }).click();
   await page.getByLabel("Screenshot file").setInputFiles(path.join(FIXTURES, "login-error.png"));
   await page.getByRole("button", { name: "Find regions with SAM 3.1" }).click();
 

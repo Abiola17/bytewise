@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import Editor, { type OnMount } from "@monaco-editor/react";
 import { Loader2 } from "lucide-react";
+import { MONACO_FONT, MONACO_THEME, defineBytewiseTheme } from "@/lib/monaco-theme";
 
 type MonacoEditor = Parameters<OnMount>[0];
 type Monaco = Parameters<OnMount>[1];
@@ -50,7 +51,7 @@ export function CodeViewer({
   };
 
   // Re-apply when the file or range changes; Monaco keeps the same instance.
-  useEffect(applyHighlight, [highlight, content]);
+  useEffect(applyHighlight, [highlight, content, path]);
 
   return (
     <Editor
@@ -58,7 +59,8 @@ export function CodeViewer({
       path={path}
       value={content}
       language={language}
-      theme="vs-dark"
+      theme={MONACO_THEME}
+      beforeMount={defineBytewiseTheme}
       loading={
         <span className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" aria-hidden /> Loading editor…
@@ -69,9 +71,13 @@ export function CodeViewer({
         domReadOnly: true,
         minimap: { enabled: false },
         fontSize: 13,
+        fontFamily: MONACO_FONT,
+        lineHeight: 20,
+        padding: { top: 12 },
         scrollBeyondLastLine: false,
-        renderLineHighlight: "none",
+        renderLineHighlight: "line",
         automaticLayout: true,
+        smoothScrolling: true,
       }}
       onMount={(editor, monaco) => {
         editorRef.current = editor;

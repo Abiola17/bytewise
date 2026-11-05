@@ -1,6 +1,6 @@
-import { SessionWorkspace } from "@/components/session/session-workspace";
+import { IdeWorkspace } from "@/components/ide/ide-workspace";
 
 export default async function SessionPage({ params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = await params;
-  return <SessionWorkspace sessionId={sessionId} />;
+  return <IdeWorkspace sessionId={sessionId} />;
 }

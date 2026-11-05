@@ -14,3 +14,9 @@ test-results/
 playwright-report/
 .vscode-test/
 apps/vscode/dist/
+
+# Local notes and build caches (never pushed)
+implementation*.md
+CLAUDE.md
+.claude/
+*.tsbuildinfo

@@ -22,29 +22,29 @@ function steps(s: DashboardSummary): Step[] {
       href: "/projects",
     },
     {
-      title: "Start a debugging session",
-      how: "Open the project → click New debugging session (top right).",
+      title: "Start a chat",
+      how: "Open the project. The chat is on the right; it starts when you send a message or run a script.",
       done: s.sessions.total > 0,
       href: "/projects",
     },
     {
       title: "Run the tests to see the bug",
-      how: "In the session, open the Tests tab → click Run. Expect Failed.",
+      how: "Open the terminal (bottom panel) → click test. Expect Failed.",
       done: executedRuns > 0,
     },
     {
       title: "Describe the bug and get a diagnosis",
-      how: "Type (or dictate) the problem in the chat and send it. Read the Diagnosis tab.",
+      how: "Type (or dictate) the problem in the chat and send it. Read the diagnosis card.",
       done: s.diagnoses > 0,
     },
     {
       title: "Review and apply a fix",
-      how: "Patch tab → Propose a fix → check the diff → Apply patch → Confirm and apply.",
+      how: "Propose a fix → check the diff in the editor → Accept and apply.",
       done: s.patches.applied > 0,
     },
     {
       title: "Verify the fix",
-      how: "Tests tab → Run again. Passed means the session becomes Fix verified.",
+      how: "Verify the fix → Run. Passed means the chat becomes Fix verified.",
       done: s.sessions.fixVerified > 0,
     },
   ];

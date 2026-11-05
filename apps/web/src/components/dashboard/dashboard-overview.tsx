@@ -56,8 +56,8 @@ export function DashboardOverview() {
               (outcomes.state.data.totalRuns === 0 ? (
                 <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
                   <FlaskConical className="mx-auto mb-2 size-6" aria-hidden />
-                  No test runs in the last {CHART_DAYS} days. Run tests from a debugging
-                  session&apos;s Tests tab to see outcomes here.
+                  No test runs in the last {CHART_DAYS} days. Run tests from a chat&apos;s
+                  terminal to see outcomes here.
                 </div>
               ) : (
                 <TestOutcomesChart data={outcomes.state.data} />

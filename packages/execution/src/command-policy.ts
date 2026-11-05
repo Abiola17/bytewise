@@ -5,8 +5,10 @@ import type { VerificationCommand } from "@bytewise/shared";
 /**
  * Only these package.json script names may run. Scripts are the project's own
  * configuration — never model output — and patches cannot edit package.json.
+ * `build` is allowed as a compile check (e.g. `next build`); servers (`dev`,
+ * `start`) and anything else are not.
  */
-const ALLOWED_SCRIPT = /^(test|test:[\w.-]+|typecheck|type-check|lint|check)$/;
+const ALLOWED_SCRIPT = /^(test|test:[\w.-]+|typecheck|type-check|lint|check|build)$/;
 const MAX_PACKAGE_JSON_BYTES = 256 * 1024;
 
 type PackageManager = "npm" | "pnpm" | "yarn";
@@ -71,7 +73,7 @@ export function resolveVerificationCommand(projectRoot: string, script: string):
     return {
       allowed: false,
       label,
-      reason: `"${script}" is not an allowed verification script (allowed: test, test:*, typecheck, lint, check).`,
+      reason: `"${script}" is not an allowed verification script (allowed: test, test:*, typecheck, lint, check, build).`,
     };
   }
   const definition = readScripts(projectRoot)[script];

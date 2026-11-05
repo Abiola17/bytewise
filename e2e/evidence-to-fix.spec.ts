@@ -13,18 +13,16 @@ test("diagnose, patch, approve and verify the demo login bug", async ({ page }) 
   await page.getByRole("link", { name: /broken-login-app/ }).click();
   await expect(page.getByRole("navigation", { name: "Project files" })).toBeVisible();
 
-  // 2. Start a debugging session.
-  await page.getByRole("button", { name: "New debugging session" }).click();
+  // 2. Baseline: the real test suite fails before any change. Running a script
+  //    from the terminal starts the chat.
+  await page.getByRole("button", { name: "Toggle terminal" }).click();
+  await page.getByRole("button", { name: "Run test", exact: true }).click();
   await expect(page).toHaveURL(/\/sessions\/[\w-]+$/);
-
-  // 3. Baseline: the real test suite fails before any change.
-  await page.getByRole("tab", { name: "Tests" }).click();
-  await page.getByRole("button", { name: "Run", exact: true }).click();
   const result = page.getByRole("region", { name: "Verification result" });
   await expect(result.getByText("Failed", { exact: true })).toBeVisible({ timeout: RUN_TIMEOUT });
   await expect(result.getByText("Baseline (no patch)")).toBeVisible();
 
-  // 4. Describe the bug; the model returns an evidence-grounded hypothesis.
+  // 3. Describe the bug; the model returns an evidence-grounded hypothesis.
   await page
     .getByLabel("Message")
     .fill("The login endpoint returns a 500 error when a user submits valid credentials.");
@@ -34,26 +32,26 @@ test("diagnose, patch, approve and verify the demo login bug", async ({ page }) 
   });
   await expect(page.getByText("Supporting evidence")).toBeVisible();
 
-  // 5. Propose a patch, review it, and explicitly approve it.
-  await page.getByRole("tab", { name: "Patch" }).click();
+  // 4. Propose a patch, review it in the chat, and explicitly accept it.
   await page.getByRole("button", { name: "Propose a fix" }).click();
-  await expect(page.getByRole("button", { name: "Apply patch" })).toBeVisible({
+  const change = page.getByRole("region", { name: "Proposed change" });
+  await expect(change.getByRole("button", { name: "Accept and apply" })).toBeVisible({
     timeout: MODEL_TIMEOUT,
   });
-  await expect(page.getByText("src/services/session.js").first()).toBeVisible();
-  await page.getByRole("button", { name: "Apply patch" }).click();
-  await page.getByRole("button", { name: "Confirm and apply" }).click();
-  await expect(page.getByText("Applied", { exact: true })).toBeVisible();
+  await expect(change.getByText("src/services/session.js")).toBeVisible();
+  // The diff opens in the editor before anything is written.
+  await expect(page.getByRole("tab", { name: /session\.js.*proposed/ })).toBeVisible();
+  await change.getByRole("button", { name: "Accept and apply" }).click();
+  await expect(change.getByText("Applied", { exact: true })).toBeVisible();
 
-  // 6. Verify: the same real test suite now passes with the patch applied.
-  await page.getByRole("tab", { name: "Tests" }).click();
-  await page.getByRole("button", { name: "Run", exact: true }).click();
+  // 5. Verify: the same real test suite now passes with the patch applied.
+  await page.getByRole("button", { name: "Run test", exact: true }).click();
   await expect(result.getByText("Passed", { exact: true })).toBeVisible({ timeout: RUN_TIMEOUT });
   await expect(result.getByText("With patch applied")).toBeVisible();
   await expect(result.getByText(/fail 0/)).toBeVisible();
   await expect(page.locator("header").getByText("Fix verified")).toBeVisible();
 
-  // 7. The dashboard reflects the stored outcome.
+  // 6. The dashboard reflects the stored outcome.
   await page.getByRole("link", { name: "Dashboard" }).click();
   await expect(
     page.getByRole("group", { name: "Verified fixes" }).getByText("1", { exact: true }),

@@ -1,4 +1,4 @@
-import { ProjectWorkspace } from "@/components/project/project-workspace";
+import { IdeWorkspace } from "@/components/ide/ide-workspace";
 
 export default async function ProjectPage({
   params,
@@ -21,5 +21,5 @@ export default async function ProjectPage({
       }
     : null;
 
-  return <ProjectWorkspace projectId={projectId} initialFile={initialFile} />;
+  return <IdeWorkspace projectId={projectId} initialFile={initialFile} />;
 }

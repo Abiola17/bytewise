@@ -13,9 +13,12 @@ import { Button } from "@/components/ui/button";
 export function VoiceButton({
   disabled,
   onTranscript,
+  compact = false,
 }: {
   disabled: boolean;
   onTranscript: (text: string) => void;
+  /** Small ghost icon button with inline status, for toolbars. */
+  compact?: boolean;
 }) {
   const handleAudio = useCallback(
     async (pcm: ArrayBuffer) => {
@@ -29,11 +32,12 @@ export function VoiceButton({
   const { state } = recorder;
 
   return (
-    <div className="flex flex-col items-center gap-1">
+    <div className={compact ? "flex items-center gap-1.5" : "flex flex-col items-center gap-1"}>
       {state.status === "recording" ? (
         <Button
           type="button"
           variant="destructive"
+          size={compact ? "sm" : "default"}
           onClick={() => void recorder.stop()}
           aria-label={`Stop recording (${state.seconds}s)`}
         >
@@ -42,7 +46,9 @@ export function VoiceButton({
       ) : (
         <Button
           type="button"
-          variant="outline"
+          variant={compact ? "ghost" : "outline"}
+          size={compact ? "icon" : "default"}
+          className={compact ? "size-8 text-muted-foreground" : undefined}
           disabled={disabled || state.status === "processing"}
           onClick={() => void recorder.start()}
           aria-label="Dictate with voice"
