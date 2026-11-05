@@ -11,7 +11,7 @@ export interface BytewiseApi {
   edits: EditManager;
 }
 
-/** Shows the Bytewise sidebar and focuses the chat. */
+/** Shows the Bytewise secondary sidebar on the right and focuses the chat. */
 async function openChat() {
   await vscode.commands.executeCommand("workbench.view.extension.bytewise");
   await vscode.commands.executeCommand(`${ChatViewProvider.viewId}.focus`);
@@ -20,7 +20,7 @@ async function openChat() {
 export async function activate(context: vscode.ExtensionContext): Promise<BytewiseApi> {
   const chat = new ChatViewProvider(context);
 
-  // Always-visible entry point: the activity-bar icon can be hidden in overflow.
+  // Always-visible fallback entry point on the status bar.
   const statusItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
   statusItem.text = "$(bug) Bytewise";
   statusItem.tooltip = "Open the Bytewise chat";
@@ -80,7 +80,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Bytewi
     await context.globalState.update(WELCOMED_KEY, true);
     await openChat();
     void vscode.window.showInformationMessage(
-      "Bytewise is ready. Open it any time from “Bytewise” in the status bar or the bug icon in the activity bar.",
+      "Bytewise is ready. Open it from “Bytewise” in the status bar or the bug icon in the right-side activity bar.",
     );
   }
 

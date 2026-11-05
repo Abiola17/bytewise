@@ -25,7 +25,7 @@
   ],
   "contributes": {
     "viewsContainers": {
-      "activitybar": [
+      "secondarySidebar": [
         {
           "id": "bytewise",
           "title": "Bytewise",

@@ -42,7 +42,7 @@ async function openWorkspaceFile(input: string, line?: number) {
   }
 }
 
-/** The sidebar chat panel. The API key never leaves the extension host. */
+/** The right-side secondary sidebar chat panel. The API key never leaves the extension host. */
 export class ChatViewProvider implements vscode.WebviewViewProvider {
   static readonly viewId = "bytewise.chat";
   private view: vscode.WebviewView | undefined;
