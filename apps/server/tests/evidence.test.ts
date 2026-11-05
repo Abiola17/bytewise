@@ -91,7 +91,9 @@ describe("POST /projects/:id/evidence on the demo app", () => {
   it("returns excerpts that match the real file contents and respects the budget", async () => {
     const result = await evidenceFor("login session token config secret user password");
     // Code evidence fills at most maxItems; the small package.json scripts block rides on top.
-    const code = result.evidence.filter((e) => !e.reason.startsWith("The project's package.json scripts"));
+    const code = result.evidence.filter(
+      (e) => !e.reason.startsWith("The project's package.json scripts"),
+    );
     expect(code.length).toBeLessThanOrEqual(CONTEXT_BUDGET.maxItems);
     expect(result.evidence.length - code.length).toBeLessThanOrEqual(1);
     expect(result.budget.usedChars).toBeLessThanOrEqual(CONTEXT_BUDGET.maxTotalChars);

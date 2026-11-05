@@ -35,25 +35,83 @@ async function openSession(page: Page) {
   await expect(page).toHaveURL(/\/sessions\/[\w-]+$/);
 }
 
-test("dictates a bug report into the message box without sending it", async ({ page }) => {
+test("dictation streams words into the box while speaking, keeping typed text", async ({
+  page,
+}) => {
   await openProject(page);
-
-  await page.getByRole("button", { name: "Dictate with voice" }).click();
-  await expect(page.getByRole("button", { name: /Stop recording/ })).toBeVisible();
-  await page.waitForTimeout(6000); // the fixture is ~5 s of speech
-  await page.getByRole("button", { name: /Stop recording/ }).click();
-
   const input = page.getByLabel("Message");
-  await expect(input).toHaveValue(/login endpoint/i, { timeout: 60_000 });
-  await expect(input).toHaveValue(/500/);
+  await input.fill("Context:");
+
+  await page.getByRole("button", { name: "Dictate", exact: true }).click();
+  const stop = page.getByRole("button", { name: "Stop dictation" });
+  await expect(stop).toBeVisible();
+  // Words appear while the microphone is still on, after what was typed.
+  await expect(input).toHaveValue(/^Context: \S+/, { timeout: 20_000 });
+  await expect(stop).toBeVisible();
+  await expect(input).toHaveValue(/login endpoint/i, { timeout: 20_000 });
+
+  await stop.click();
+  await expect(page.getByRole("button", { name: "Dictate", exact: true })).toBeVisible({
+    timeout: 30_000,
+  });
+  await expect(input).toHaveValue(/^Context: .*login endpoint/i);
   // Nothing was sent: the transcript waits for the developer to review it.
   await expect(page.getByText("AI hypothesis")).toHaveCount(0);
+});
+
+test("Esc cancels dictation and restores what was typed", async ({ page }) => {
+  await openProject(page);
+  const input = page.getByLabel("Message");
+  await input.fill("Typed first");
+  await page.getByRole("button", { name: "Dictate", exact: true }).click();
+  await expect(input).toHaveValue(/^Typed first \S+/, { timeout: 20_000 });
+  await input.press("Escape");
+  await expect(page.getByRole("button", { name: "Dictate", exact: true })).toBeVisible();
+  await expect(input).toHaveValue("Typed first");
+});
+
+test("an attached image reaches the model with the message", async ({ page }) => {
+  await openProject(page);
+  await page
+    .locator('input[type="file"][accept*="image/png"]')
+    .first()
+    .setInputFiles(path.join(FIXTURES, "login-error.png"));
+  await expect(page.getByRole("img", { name: "login-error.png" })).toBeVisible();
+
+  const input = page.getByLabel("Message");
+  await input.fill("Describe the error message shown in this screenshot.");
+  await input.press("Enter");
+
+  // The stored message shows the image, served back by the API.
+  const sent = page.getByRole("link", { name: "login-error.png" });
+  await expect(sent).toBeVisible({ timeout: 120_000 });
+  expect(
+    await sent.locator("img").evaluate((img: HTMLImageElement) => img.naturalWidth),
+  ).toBeGreaterThan(0);
+  // The tray is cleared once the message is sent.
+  await expect(page.getByRole("button", { name: "Remove login-error.png" })).toHaveCount(0);
+});
+
+test("sending while dictating stops the microphone", async ({ page }) => {
+  await openProject(page);
+  const input = page.getByLabel("Message");
+  await page.getByRole("button", { name: "Dictate", exact: true }).click();
+  await expect(input).toHaveValue(/login endpoint/i, { timeout: 20_000 });
+  const spoken = await input.inputValue();
+  await input.press("Enter");
+
+  await expect(page.getByRole("button", { name: "Dictate", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Stop dictation" })).toHaveCount(0);
+  // The spoken words were sent; late transcript text does not refill the box.
+  await expect(page.getByText(spoken.trim(), { exact: true }).first()).toBeVisible();
+  await page.waitForTimeout(3000);
+  await expect(input).toHaveValue("");
 });
 
 test("highlights screenshot regions with SAM and records them as evidence", async ({ page }) => {
   await openSession(page);
 
-  await page.getByRole("button", { name: "Add a screenshot" }).click();
+  await page.getByRole("button", { name: "Evidence", exact: true }).click();
   await page.getByLabel("Screenshot file").setInputFiles(path.join(FIXTURES, "login-error.png"));
   await page.getByRole("button", { name: "Find regions with SAM 3.1" }).click();
 

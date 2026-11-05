@@ -368,10 +368,7 @@ export function buildEvidence(files: SearchableFile[], query: string): EvidenceR
   let usedChars = 0;
   let droppedItems = 0;
   for (const item of deduped) {
-    if (
-      evidence.length >= CONTEXT_BUDGET.maxItems ||
-      usedChars + item.excerpt.length > charLimit
-    ) {
+    if (evidence.length >= CONTEXT_BUDGET.maxItems || usedChars + item.excerpt.length > charLimit) {
       droppedItems++;
       continue;
     }

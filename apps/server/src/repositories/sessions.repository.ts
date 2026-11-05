@@ -4,12 +4,14 @@ import {
   debugSessions,
   diagnoses,
   evidence,
+  messageImages,
   messages,
   projects,
   screenshots,
   type DebugSessionRow,
   type DiagnosisRow,
   type EvidenceRow,
+  type MessageImageRow,
   type MessageRow,
   type ScreenshotRow,
 } from "../database/schema";
@@ -79,8 +81,25 @@ export function createSessionsRepository(db: Db) {
         .all();
     },
 
-    insertMessage(row: MessageRow): MessageRow {
-      return db.insert(messages).values(row).returning().get();
+    insertMessage(row: MessageRow, images: MessageImageRow[] = []): MessageRow {
+      return db.transaction((tx) => {
+        const message = tx.insert(messages).values(row).returning().get();
+        if (images.length) tx.insert(messageImages).values(images).run();
+        return message;
+      });
+    },
+
+    messageImages(sessionId: string): MessageImageRow[] {
+      return db
+        .select()
+        .from(messageImages)
+        .where(eq(messageImages.sessionId, sessionId))
+        .orderBy(asc(messageImages.createdAt))
+        .all();
+    },
+
+    messageImage(id: string): MessageImageRow | undefined {
+      return db.select().from(messageImages).where(eq(messageImages.id, id)).get();
     },
 
     insertEvidence(rows: EvidenceRow[]) {

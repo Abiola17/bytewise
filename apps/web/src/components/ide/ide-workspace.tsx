@@ -21,6 +21,7 @@ import type {
   FileListResponse,
   HealthResponse,
   PatchProposal,
+  PostMessageRequest,
   Project,
   SessionDetail,
   SessionListResponse,
@@ -31,7 +32,7 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { LineRange } from "@/components/project/code-viewer";
-import { AgentChat } from "./agent-chat";
+import { AgentChat, type PendingChatMessage } from "./agent-chat";
 import { isFileEvidence, type PatchAction, type StoredEvidence } from "./chat-cards";
 import { EditorArea, tabKey, type EditorTab, type FileEntry } from "./editor-area";
 import { ResizeHandle, usePersistentSize } from "./resize-handle";
@@ -90,12 +91,22 @@ export function IdeWorkspace({
   const [terminalOpen, setTerminalOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(true);
   const [mobilePane, setMobilePane] = useState<MobilePane>("chat");
-  const [sidebarWidth, setSidebarWidth, sidebarLimits] = usePersistentSize("bytewise.sidebar", 260, 180, 480);
+  const [sidebarWidth, setSidebarWidth, sidebarLimits] = usePersistentSize(
+    "bytewise.sidebar",
+    260,
+    180,
+    480,
+  );
   const [chatWidth, setChatWidth, chatLimits] = usePersistentSize("bytewise.chat", 440, 340, 760);
-  const [terminalHeight, setTerminalHeight, terminalLimits] = usePersistentSize("bytewise.terminal", 240, 120, 600);
+  const [terminalHeight, setTerminalHeight, terminalLimits] = usePersistentSize(
+    "bytewise.terminal",
+    240,
+    120,
+    600,
+  );
 
   // Actions
-  const [pending, setPending] = useState<string | null>(null);
+  const [pending, setPending] = useState<PendingChatMessage | null>(null);
   const [sending, setSending] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
   const [patchBusy, setPatchBusy] = useState<PatchAction | null>(null);
@@ -166,7 +177,9 @@ export function IdeWorkspace({
       if (!projectId) return;
       const { reload = false, activate = true, reveal = true } = opts;
       if (activate) {
-        setTabs((t) => (t.some((x) => x.kind === "file" && x.path === path) ? t : [...t, { kind: "file", path }]));
+        setTabs((t) =>
+          t.some((x) => x.kind === "file" && x.path === path) ? t : [...t, { kind: "file", path }],
+        );
         setActiveKey(`file:${path}`);
         setHighlights((h) => ({ ...h, [path]: range }));
         if (reveal) setMobilePane("editor");
@@ -177,7 +190,10 @@ export function IdeWorkspace({
         const file = await api.readFile(projectId, path);
         setFileCache((c) => ({ ...c, [path]: { status: "success", file } }));
       } catch (e) {
-        setFileCache((c) => ({ ...c, [path]: { status: "error", message: message(e, "Could not read the file.") } }));
+        setFileCache((c) => ({
+          ...c,
+          [path]: { status: "error", message: message(e, "Could not read the file.") },
+        }));
       }
     },
     [projectId],
@@ -222,7 +238,13 @@ export function IdeWorkspace({
   const closeDiffTabs = (patchId?: string) =>
     setTabs((current) => {
       const next = current.filter((t) => t.kind !== "diff" || (patchId && t.patchId !== patchId));
-      setActiveKey((key) => (next.some((t) => tabKey(t) === key) ? key : next[next.length - 1] ? tabKey(next[next.length - 1]!) : null));
+      setActiveKey((key) =>
+        next.some((t) => tabKey(t) === key)
+          ? key
+          : next[next.length - 1]
+            ? tabKey(next[next.length - 1]!)
+            : null,
+      );
       return next;
     });
 
@@ -249,17 +271,27 @@ export function IdeWorkspace({
     return session.id;
   }
 
-  async function send(content: string): Promise<boolean> {
+  async function send(
+    content: string,
+    images: PostMessageRequest["images"] = [],
+    previews?: Array<{ name?: string; preview: string }>,
+  ): Promise<boolean> {
     setChatError(null);
     // A new message brings a new diagnosis; earlier patch errors no longer apply.
     setProposeError(null);
     setPatchError(null);
-    setPending(content);
+    const pendingPreviews =
+      previews ??
+      images.map((img) => ({
+        name: img.fileName,
+        preview: `data:${img.mimeType};base64,${img.data}`,
+      }));
+    setPending({ content, images: pendingPreviews });
     setSending(true);
     let id: string | null = sessionId;
     try {
       id = await ensureSession();
-      const d = await api.postMessage(id, content);
+      const d = await api.postMessage(id, content, images);
       setDetail(d);
       // Show the code the diagnosis relies on, like a teammate pointing at the line.
       const diagnosis = d.diagnoses[d.diagnoses.length - 1];
@@ -267,7 +299,11 @@ export function IdeWorkspace({
         .map((eid) => d.evidence.find((e) => e.id === eid))
         .find((e): e is StoredEvidence => Boolean(e && isFileEvidence(e)));
       if (first) {
-        void openFile(first.relativePath, { startLine: first.startLine, endLine: first.endLine }, { reveal: false });
+        void openFile(
+          first.relativePath,
+          { startLine: first.startLine, endLine: first.endLine },
+          { reveal: false },
+        );
       }
       void refreshSessions();
       return true;
@@ -277,7 +313,10 @@ export function IdeWorkspace({
       // The server keeps the user message when the model fails; show what it stored.
       const stored = await loadSession(id).catch(() => null);
       const last = stored?.messages[stored.messages.length - 1];
-      return last?.role === "user" && last.content.trim() === content.trim();
+      return (
+        last?.role === "user" &&
+        (content ? last.content.trim() === content.trim() : last.images.length > 0)
+      );
     } finally {
       setPending(null);
       setSending(false);
@@ -317,7 +356,8 @@ export function IdeWorkspace({
         if (action !== "reject") {
           // Files on disk changed: refresh every open copy from the server.
           for (const f of patch.files) {
-            if (cacheRef.current[f.path]) void openFile(f.path, null, { reload: true, activate: false });
+            if (cacheRef.current[f.path])
+              void openFile(f.path, null, { reload: true, activate: false });
           }
         }
         if (action === "reject" || patch.status === "applied") closeDiffTabs(patchId);
@@ -389,7 +429,9 @@ export function IdeWorkspace({
   const modifiedPaths = useMemo(
     () =>
       new Set(
-        detail?.patches.filter((p) => p.status === "applied").flatMap((p) => p.files.map((f) => f.path)) ?? [],
+        detail?.patches
+          .filter((p) => p.status === "applied")
+          .flatMap((p) => p.files.map((f) => f.path)) ?? [],
       ),
     [detail],
   );
@@ -451,10 +493,16 @@ export function IdeWorkspace({
           <span className="hidden sm:inline">Bytewise</span>
         </Link>
         <ChevronRight className="size-3.5 shrink-0 text-muted-foreground/60" aria-hidden />
-        <Link href="/projects" className="hidden text-muted-foreground hover:text-foreground sm:inline">
+        <Link
+          href="/projects"
+          className="hidden text-muted-foreground hover:text-foreground sm:inline"
+        >
           Projects
         </Link>
-        <ChevronRight className="hidden size-3.5 shrink-0 text-muted-foreground/60 sm:block" aria-hidden />
+        <ChevronRight
+          className="hidden size-3.5 shrink-0 text-muted-foreground/60 sm:block"
+          aria-hidden
+        />
         <h1 className="shrink-0 font-medium">{project.name}</h1>
         {detail && (
           <>
@@ -469,11 +517,32 @@ export function IdeWorkspace({
         )}
         <div className="ml-auto flex shrink-0 items-center gap-0.5">
           <div className="hidden items-center gap-0.5 lg:flex">
-            <PanelToggle label="Toggle sidebar" active={sidebarOpen} onClick={() => setSidebarOpen((v) => !v)} icon={PanelLeft} />
-            <PanelToggle label="Toggle terminal" active={terminalOpen} onClick={() => setTerminalOpen((v) => !v)} icon={PanelBottom} />
-            <PanelToggle label="Toggle chat" active={chatOpen} onClick={() => setChatOpen((v) => !v)} icon={PanelRight} />
+            <PanelToggle
+              label="Toggle sidebar"
+              active={sidebarOpen}
+              onClick={() => setSidebarOpen((v) => !v)}
+              icon={PanelLeft}
+            />
+            <PanelToggle
+              label="Toggle terminal"
+              active={terminalOpen}
+              onClick={() => setTerminalOpen((v) => !v)}
+              icon={PanelBottom}
+            />
+            <PanelToggle
+              label="Toggle chat"
+              active={chatOpen}
+              onClick={() => setChatOpen((v) => !v)}
+              icon={PanelRight}
+            />
           </div>
-          <Button size="sm" variant="outline" className="ml-1.5 h-7" onClick={newChat} disabled={sending}>
+          <Button
+            size="sm"
+            variant="outline"
+            className="ml-1.5 h-7"
+            onClick={newChat}
+            disabled={sending}
+          >
             <MessageSquarePlus aria-hidden /> <span className="hidden sm:inline">New chat</span>
           </Button>
         </div>
@@ -481,10 +550,13 @@ export function IdeWorkspace({
 
       <div className="flex min-h-0 flex-1">
         {/* Activity bar */}
-        <nav aria-label="Workspace views" className="hidden w-12 shrink-0 flex-col items-center gap-1 border-r bg-panel py-2 lg:flex">
+        <nav
+          aria-label="Workspace views"
+          className="hidden w-12 shrink-0 flex-col items-center gap-1 border-r bg-panel py-2 lg:flex"
+        >
           {SIDEBAR_VIEWS.map(({ id, label, icon: Icon }) => {
             const active = sidebarOpen && sidebarView === id;
-            const count = id === "evidence" ? detail?.evidence.length ?? 0 : 0;
+            const count = id === "evidence" ? (detail?.evidence.length ?? 0) : 0;
             return (
               <button
                 key={id}
@@ -498,7 +570,12 @@ export function IdeWorkspace({
                   active && "text-foreground",
                 )}
               >
-                {active && <span aria-hidden className="absolute top-1.5 bottom-1.5 -left-1.5 w-0.5 rounded-full bg-primary" />}
+                {active && (
+                  <span
+                    aria-hidden
+                    className="absolute top-1.5 bottom-1.5 -left-1.5 w-0.5 rounded-full bg-primary"
+                  />
+                )}
                 <Icon className="size-[18px]" aria-hidden />
                 {count > 0 && (
                   <span className="absolute top-1 right-0.5 min-w-3.5 rounded-full bg-primary px-1 text-[9px] leading-3.5 font-semibold text-primary-foreground">
@@ -509,10 +586,20 @@ export function IdeWorkspace({
             );
           })}
           <div className="mt-auto flex flex-col items-center gap-1">
-            <Link href="/" aria-label="Dashboard" title="Dashboard" className="flex size-9 items-center justify-center rounded-md text-muted-foreground hover:text-foreground">
+            <Link
+              href="/"
+              aria-label="Dashboard"
+              title="Dashboard"
+              className="flex size-9 items-center justify-center rounded-md text-muted-foreground hover:text-foreground"
+            >
               <LayoutDashboard className="size-[18px]" aria-hidden />
             </Link>
-            <Link href="/guide" aria-label="Guide" title="Guide" className="flex size-9 items-center justify-center rounded-md text-muted-foreground hover:text-foreground">
+            <Link
+              href="/guide"
+              aria-label="Guide"
+              title="Guide"
+              className="flex size-9 items-center justify-center rounded-md text-muted-foreground hover:text-foreground"
+            >
               <BookOpen className="size-[18px]" aria-hidden />
             </Link>
           </div>
@@ -654,7 +741,9 @@ export function IdeWorkspace({
               chatError={chatError}
               onSend={send}
               onRetry={() => void retry()}
-              onOpenFile={(p, line) => void openFile(p, line ? { startLine: line, endLine: line } : null)}
+              onOpenFile={(p, line) =>
+                void openFile(p, line ? { startLine: line, endLine: line } : null)
+              }
               onOpenEvidence={openEvidence}
               patchBusy={patchBusy}
               patchError={patchError}
@@ -669,11 +758,6 @@ export function IdeWorkspace({
                 setSelectedRunId(id);
                 setTerminalOpen(true);
                 setMobilePane("editor");
-              }}
-              onAttachScreenshot={() => {
-                setSidebarView("evidence");
-                setSidebarOpen(true);
-                setMobilePane("files");
               }}
               modelLabel={modelLabel}
             />
@@ -712,8 +796,14 @@ export function IdeWorkspace({
         </span>
         <span>{project.language}</span>
         {files && <span>{files.files.length} files</span>}
-        {modifiedPaths.size > 0 && <span className="text-warning">{modifiedPaths.size} modified</span>}
-        <button type="button" onClick={() => setTerminalOpen((v) => !v)} className="hover:text-foreground">
+        {modifiedPaths.size > 0 && (
+          <span className="text-warning">{modifiedPaths.size} modified</span>
+        )}
+        <button
+          type="button"
+          onClick={() => setTerminalOpen((v) => !v)}
+          className="hover:text-foreground"
+        >
           {runs.length > 0 ? `${runs.length} run${runs.length === 1 ? "" : "s"}` : "No runs yet"}
         </button>
         <span className="ml-auto flex items-center gap-1.5">
@@ -721,10 +811,15 @@ export function IdeWorkspace({
             <>
               <span
                 aria-hidden
-                className={cn("size-1.5 rounded-full", health.modelProvider.configured ? "bg-success" : "bg-warning")}
+                className={cn(
+                  "size-1.5 rounded-full",
+                  health.modelProvider.configured ? "bg-success" : "bg-warning",
+                )}
               />
               {health.modelProvider.name} · {health.modelProvider.model}
-              {!health.modelProvider.configured && <span className="text-warning">· API key missing</span>}
+              {!health.modelProvider.configured && (
+                <span className="text-warning">· API key missing</span>
+              )}
             </>
           ) : (
             <span className="text-warning">Server unreachable</span>

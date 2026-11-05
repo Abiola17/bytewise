@@ -60,9 +60,7 @@
       "indexes": {
         "projects_directory_unique": {
           "name": "projects_directory_unique",
-          "columns": [
-            "directory"
-          ],
+          "columns": ["directory"],
           "isUnique": true
         }
       },

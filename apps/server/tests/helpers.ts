@@ -21,6 +21,9 @@ const noNetworkTranscription: TranscriptionProvider = {
   async transcribe() {
     throw new Error("Test attempted a transcription call without providing a test provider.");
   },
+  live() {
+    throw new Error("Test attempted a live transcription without providing a test provider.");
+  },
 };
 
 const noNetworkSegmentation: SegmentationProvider = {

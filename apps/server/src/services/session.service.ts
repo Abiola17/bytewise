@@ -16,6 +16,7 @@ import type { PatchesRepository } from "../repositories/patches.repository";
 import type { VerificationsRepository } from "../repositories/verifications.repository";
 import type { SessionsRepository } from "../repositories/sessions.repository";
 import { toScreenshotDto } from "./media.service";
+import { toMessageImageDto } from "./message-images.service";
 import { toPatchDto } from "./patch-dto";
 import type { ProjectService } from "./project.service";
 
@@ -79,12 +80,20 @@ export function createSessionService(deps: {
     detail(sessionId: string): SessionDetail {
       const row = this.getRow(sessionId);
       const project = projectService.get(row.projectId);
+      const imagesByMessage = new Map<string, ReturnType<typeof sessions.messageImages>>();
+      for (const image of sessions.messageImages(sessionId)) {
+        imagesByMessage.set(image.messageId, [
+          ...(imagesByMessage.get(image.messageId) ?? []),
+          image,
+        ]);
+      }
       return {
         session: toSessionDto(row),
         project: { id: project.id, name: project.name },
         messages: sessions.messages(sessionId).map((m) => ({
           ...m,
           role: m.role as "user" | "assistant",
+          images: (imagesByMessage.get(m.id) ?? []).map(toMessageImageDto),
         })),
         evidence: sessions.evidence(sessionId).map((e) => ({
           id: e.id,

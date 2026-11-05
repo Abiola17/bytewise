@@ -23,7 +23,7 @@ function provider(patchScript: Script) {
     async generateStructured(request) {
       if (request.schema.name === "bytewise_diagnosis") {
         const ids = [
-          ...request.messages[1]!.content.matchAll(
+          ...String(request.messages[1]!.content).matchAll(
             /<evidence id="(ev_[0-9a-f]+)"[^>]*path="src\/services\/session\.js"/g,
           ),
         ].map((m) => m[1]);
