@@ -19,7 +19,7 @@ export function toVerificationDto(row: VerificationRunRow): VerificationRun {
 
 /** Maps what actually happened to a status. Only exit code 0 counts as passed. */
 export function statusFor(result: ProcessResult): VerificationRun["status"] {
-  if (result.outcome === "spawn_error") return "error";
+  if (result.outcome === "spawn_error" || result.outcome === "cancelled") return "error";
   if (result.outcome === "timed_out") return "timed_out";
   if (result.exitCode === 0) return "passed";
   if (result.exitCode === null) return "error"; // killed by a signal, not a test verdict

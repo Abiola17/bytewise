@@ -26,7 +26,13 @@ function createWorkspace() {
     fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true });
     fs.writeFileSync(path.join(dir, rel), content);
   };
-  write("package.json", '{"name":"smoke"}');
+  write(
+    "package.json",
+    JSON.stringify({
+      name: "smoke",
+      scripts: { test: "node -e \"console.log('smoke ok')\"", deploy: "echo no" },
+    }),
+  );
   write("src/session.js", "const signature = createHmac('sha256', config.secret);\n");
   write(".env", "SECRET=shh");
   write("node_modules/lib/index.js", "config.secret");

@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
-import { ChatViewProvider, SECRET_KEY } from "./chat-view";
+import { ChatViewProvider, listMentionableFiles, SECRET_KEY } from "./chat-view";
 import { EditManager, REVIEW_SCHEME } from "./edit-manager";
+import type { RunManager } from "./run-manager";
 
 const WELCOMED_KEY = "bytewise.welcomed";
 
@@ -9,6 +10,9 @@ export interface BytewiseApi {
   isChatReady(): boolean;
   /** Exposed for the smoke test, which drives a real review end to end. */
   edits: EditManager;
+  runs: RunManager;
+  listMentionableFiles(): Promise<string[]>;
+  lastInsertedText(): string | null;
 }
 
 /** Shows the Bytewise secondary sidebar on the right and focuses the chat. */
@@ -54,6 +58,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<Bytewi
 
     statusItem,
     chat.edits,
+    chat.runs,
+    // Never leave the microphone recording after VS Code closes the extension.
+    { dispose: () => chat.cancelVoice() },
     vscode.workspace.registerTextDocumentContentProvider(REVIEW_SCHEME, chat.edits),
     // Accept / Reject buttons on the review diff's title bar.
     vscode.commands.registerCommand("bytewise.acceptEdit", (uri?: vscode.Uri) => {
@@ -66,6 +73,30 @@ export async function activate(context: vscode.ExtensionContext): Promise<Bytewi
     }),
     vscode.commands.registerCommand("bytewise.openChat", openChat),
     vscode.commands.registerCommand("bytewise.newChat", () => chat.newChat()),
+    vscode.commands.registerCommand("bytewise.viewHistory", () => chat.viewHistory()),
+    vscode.commands.registerCommand("bytewise.transcribeVoice", (uri?: vscode.Uri) =>
+      chat.transcribeAudioFile(uri),
+    ),
+
+    // Right-click → "Ask Bytewise About Selection": mentions the selected lines.
+    vscode.commands.registerCommand("bytewise.askAboutSelection", async () => {
+      const editor = vscode.window.activeTextEditor;
+      if (!editor) return;
+      const rel = vscode.workspace.asRelativePath(editor.document.uri, false);
+      if (rel === editor.document.uri.fsPath) {
+        void vscode.window.showWarningMessage(
+          "Bytewise can only look at files inside the open folder.",
+        );
+        return;
+      }
+      const { start, end } = editor.selection;
+      const lastLine = end.character === 0 && end.line > start.line ? end.line : end.line + 1;
+      const range = editor.selection.isEmpty
+        ? `:${start.line + 1}`
+        : `:${start.line + 1}-${lastLine}`;
+      await openChat();
+      await chat.insertText(`@${rel}${range} `);
+    }),
 
     // Keep the panel in sync when the key changes (including from another window).
     context.secrets.onDidChange((e) => {
@@ -84,7 +115,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<Bytewi
     );
   }
 
-  return { isChatReady: () => chat.webviewReady, edits: chat.edits };
+  return {
+    isChatReady: () => chat.webviewReady,
+    edits: chat.edits,
+    runs: chat.runs,
+    listMentionableFiles,
+    lastInsertedText: () => chat.lastInsertedText,
+  };
 }
 
 export function deactivate() {}

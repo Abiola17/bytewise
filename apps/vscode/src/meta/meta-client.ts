@@ -13,9 +13,13 @@ export interface ToolCall {
   arguments: string;
 }
 
+/** Multimodal content (verified with muse-spark-1.3: text plus image data URLs). */
+export type ContentPart =
+  { type: "text"; text: string } | { type: "image_url"; image_url: { url: string } };
+
 export interface ChatMessage {
   role: ChatRole;
-  content: string | null;
+  content: string | null | ContentPart[];
   toolCalls?: ToolCall[];
   /** For role "tool": which call this is the result of. */
   toolCallId?: string;
@@ -64,7 +68,7 @@ export interface MetaClientOptions {
 
 interface WireMessage {
   role: ChatRole;
-  content: string | null;
+  content: string | null | ContentPart[];
   tool_calls?: Array<{
     id: string;
     type: "function";

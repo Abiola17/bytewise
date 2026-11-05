@@ -38,6 +38,9 @@ importers:
 
   apps/server:
     dependencies:
+      '@bytewise/execution':
+        specifier: workspace:*
+        version: link:../../packages/execution
       '@bytewise/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -90,6 +93,9 @@ importers:
 
   apps/vscode:
     dependencies:
+      '@bytewise/execution':
+        specifier: workspace:*
+        version: link:../../packages/execution
       '@bytewise/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -179,6 +185,19 @@ importers:
       tailwindcss:
         specifier: ^4.0.0
         version: 4.3.4
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+
+  packages/execution:
+    dependencies:
+      '@bytewise/shared':
+        specifier: workspace:*
+        version: link:../shared
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.20.5
       typescript:
         specifier: ^5.7.2
         version: 5.9.3

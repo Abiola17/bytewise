@@ -52,7 +52,13 @@ function session(replies: Reply[], workspace: WorkspaceFs | null = emptyFs) {
 }
 
 const text = (e: ChatEntry) =>
-  e.role === "step" ? e.summary : e.role === "approval" ? e.path : e.text;
+  e.role === "step"
+    ? e.summary
+    : e.role === "approval"
+      ? e.path
+      : e.role === "run"
+        ? e.label
+        : e.text;
 
 describe("chat session", () => {
   it("keeps the conversation, including tool exchanges, for follow-ups", async () => {

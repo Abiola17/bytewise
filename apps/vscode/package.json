@@ -18,7 +18,8 @@
   "files": [
     "dist/extension.js",
     "dist/webview.js",
-    "media/**"
+    "media/**",
+    "README.md"
   ],
   "activationEvents": [
     "onStartupFinished"
@@ -66,6 +67,18 @@
         "icon": "$(add)"
       },
       {
+        "command": "bytewise.viewHistory",
+        "title": "Conversation History",
+        "category": "Bytewise",
+        "icon": "$(history)"
+      },
+      {
+        "command": "bytewise.transcribeVoice",
+        "title": "Transcribe Audio File (Voice Bug Report)",
+        "category": "Bytewise",
+        "icon": "$(unmute)"
+      },
+      {
         "command": "bytewise.acceptEdit",
         "title": "Accept Proposed Change",
         "category": "Bytewise",
@@ -76,6 +89,12 @@
         "title": "Reject Proposed Change",
         "category": "Bytewise",
         "icon": "$(close)"
+      },
+      {
+        "command": "bytewise.askAboutSelection",
+        "title": "Ask Bytewise About Selection",
+        "category": "Bytewise",
+        "icon": "$(comment-discussion)"
       }
     ],
     "menus": {
@@ -83,7 +102,12 @@
         {
           "command": "bytewise.newChat",
           "when": "view == bytewise.chat",
-          "group": "navigation"
+          "group": "navigation@1"
+        },
+        {
+          "command": "bytewise.viewHistory",
+          "when": "view == bytewise.chat",
+          "group": "navigation@2"
         }
       ],
       "editor/title": [
@@ -107,6 +131,13 @@
           "command": "bytewise.rejectEdit",
           "when": "resourceScheme == bytewise-review"
         }
+      ],
+      "editor/context": [
+        {
+          "command": "bytewise.askAboutSelection",
+          "when": "editorTextFocus && resourceScheme == file",
+          "group": "bytewise@1"
+        }
       ]
     },
     "configuration": {
@@ -128,6 +159,23 @@
           "minimum": 10,
           "maximum": 600,
           "description": "How long to wait for one model response."
+        },
+        "bytewise.commandTimeoutSeconds": {
+          "type": "number",
+          "default": 120,
+          "minimum": 5,
+          "maximum": 1800,
+          "description": "Time limit for a script the agent runs (e.g. npm run test). The whole process tree is stopped when it is exceeded."
+        },
+        "bytewise.ffmpegPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to ffmpeg, used to record your voice. Leave empty to find it automatically (macOS: brew install ffmpeg)."
+        },
+        "bytewise.microphone": {
+          "type": "string",
+          "default": "",
+          "description": "Microphone to record from. Leave empty to use the built-in microphone (macOS)."
         }
       }
     }
@@ -141,9 +189,10 @@
     "package": "node esbuild.mjs --production && vsce package --no-dependencies --allow-missing-repository --skip-license -o dist/bytewise.vsix"
   },
   "dependencies": {
+    "@bytewise/execution": "workspace:*",
     "@bytewise/shared": "workspace:*",
-    "zod": "^3.24.1",
-    "diff": "^7.0.0"
+    "diff": "^7.0.0",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
