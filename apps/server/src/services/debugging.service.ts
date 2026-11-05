@@ -1,11 +1,12 @@
 import { randomUUID } from "node:crypto";
-import type { SessionDetail } from "@bytewise/shared";
+import type { PostMessageRequest, SessionDetail } from "@bytewise/shared";
 import { AppError, badRequest, conflict } from "../errors/app-error";
 import { createHash } from "node:crypto";
 import type { EvidenceItem } from "@bytewise/shared";
 import type { SessionsRepository } from "../repositories/sessions.repository";
 import type { VerificationsRepository } from "../repositories/verifications.repository";
 import type { DiagnosisService } from "./diagnosis.service";
+import type { MessageImagesService } from "./message-images.service";
 import type { ProjectFilesService } from "./project-files.service";
 import type { ProjectService } from "./project.service";
 import { DEFAULT_SESSION_TITLE, type SessionService } from "./session.service";
@@ -16,6 +17,8 @@ const EVIDENCE_QUERY_TURNS = 3;
 const TEST_OUTPUT_MAX_LINES = 80;
 const TEST_OUTPUT_MAX_CHARS = 6000;
 const MAX_SCREENSHOT_EVIDENCE = 3;
+/** Stored when the developer sends only images. */
+export const IMAGE_ONLY_REQUEST = "Please look at the attached image.";
 
 /**
  * The output of the latest verification run, if it did not pass, as observed
@@ -66,6 +69,7 @@ export function createDebuggingService(deps: {
   projectService: ProjectService;
   projectFiles: ProjectFilesService;
   diagnosisService: DiagnosisService;
+  messageImages: MessageImagesService;
 }) {
   const {
     sessions,
@@ -74,6 +78,7 @@ export function createDebuggingService(deps: {
     projectService,
     projectFiles,
     diagnosisService,
+    messageImages,
   } = deps;
   const inFlight = new Set<string>();
 
@@ -142,6 +147,12 @@ export function createDebuggingService(deps: {
         content: m.content,
       })),
       evidence,
+      // The model sees the images attached to the request it is answering.
+      images: sessions
+        .messageImages(sessionId)
+        .filter((i) => i.messageId === last.id)
+        .map((i) => messageImages.dataUrl(i))
+        .filter((url): url is string => url !== null),
     });
 
     const diagnosisId = randomUUID();
@@ -206,19 +217,35 @@ export function createDebuggingService(deps: {
 
   return {
     /** Stores a user message, then diagnoses. The message is kept even if the model call fails. */
-    async postMessage(sessionId: string, content: string): Promise<SessionDetail> {
+    async postMessage(
+      sessionId: string,
+      content: string,
+      images: PostMessageRequest["images"] = [],
+    ): Promise<SessionDetail> {
+      // Check every image by its bytes before storing anything.
+      const validated = messageImages.validate(images);
       return exclusive(sessionId, async () => {
         const session = sessionService.getRow(sessionId);
         if (session.status === "closed") throw conflict("This debugging session is closed.");
         const createdAt = new Date().toISOString();
-        sessions.insertMessage({
-          id: randomUUID(),
-          sessionId,
-          role: "user",
-          content,
-          diagnosisId: null,
-          createdAt,
-        });
+        const id = randomUUID();
+        const imageRows = messageImages.write(id, sessionId, validated);
+        try {
+          sessions.insertMessage(
+            {
+              id,
+              sessionId,
+              role: "user",
+              content: content || IMAGE_ONLY_REQUEST,
+              diagnosisId: null,
+              createdAt,
+            },
+            imageRows,
+          );
+        } catch (error) {
+          messageImages.discard(imageRows);
+          throw error;
+        }
         sessions.touchSession(sessionId, createdAt);
         return diagnose(sessionId);
       });

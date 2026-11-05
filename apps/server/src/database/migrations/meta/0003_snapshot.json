@@ -53,10 +53,7 @@
       "indexes": {
         "debug_sessions_project_idx": {
           "name": "debug_sessions_project_idx",
-          "columns": [
-            "project_id",
-            "updated_at"
-          ],
+          "columns": ["project_id", "updated_at"],
           "isUnique": false
         }
       },
@@ -65,12 +62,8 @@
           "name": "debug_sessions_project_id_projects_id_fk",
           "tableFrom": "debug_sessions",
           "tableTo": "projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -191,10 +184,7 @@
       "indexes": {
         "diagnoses_session_idx": {
           "name": "diagnoses_session_idx",
-          "columns": [
-            "session_id",
-            "created_at"
-          ],
+          "columns": ["session_id", "created_at"],
           "isUnique": false
         }
       },
@@ -203,12 +193,8 @@
           "name": "diagnoses_session_id_debug_sessions_id_fk",
           "tableFrom": "diagnoses",
           "tableTo": "debug_sessions",
-          "columnsFrom": [
-            "session_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["session_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -290,22 +276,15 @@
           "name": "evidence_session_id_debug_sessions_id_fk",
           "tableFrom": "evidence",
           "tableTo": "debug_sessions",
-          "columnsFrom": [
-            "session_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["session_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
         "evidence_session_id_id_pk": {
-          "columns": [
-            "session_id",
-            "id"
-          ],
+          "columns": ["session_id", "id"],
           "name": "evidence_session_id_id_pk"
         }
       },
@@ -361,10 +340,7 @@
       "indexes": {
         "messages_session_idx": {
           "name": "messages_session_idx",
-          "columns": [
-            "session_id",
-            "created_at"
-          ],
+          "columns": ["session_id", "created_at"],
           "isUnique": false
         }
       },
@@ -373,12 +349,8 @@
           "name": "messages_session_id_debug_sessions_id_fk",
           "tableFrom": "messages",
           "tableTo": "debug_sessions",
-          "columnsFrom": [
-            "session_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["session_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -492,10 +464,7 @@
       "indexes": {
         "patch_proposals_session_idx": {
           "name": "patch_proposals_session_idx",
-          "columns": [
-            "session_id",
-            "created_at"
-          ],
+          "columns": ["session_id", "created_at"],
           "isUnique": false
         }
       },
@@ -504,12 +473,8 @@
           "name": "patch_proposals_session_id_debug_sessions_id_fk",
           "tableFrom": "patch_proposals",
           "tableTo": "debug_sessions",
-          "columnsFrom": [
-            "session_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["session_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -517,12 +482,8 @@
           "name": "patch_proposals_diagnosis_id_diagnoses_id_fk",
           "tableFrom": "patch_proposals",
           "tableTo": "diagnoses",
-          "columnsFrom": [
-            "diagnosis_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["diagnosis_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -587,9 +548,7 @@
       "indexes": {
         "projects_directory_unique": {
           "name": "projects_directory_unique",
-          "columns": [
-            "directory"
-          ],
+          "columns": ["directory"],
           "isUnique": true
         }
       },
@@ -710,10 +669,7 @@
       "indexes": {
         "verification_runs_session_idx": {
           "name": "verification_runs_session_idx",
-          "columns": [
-            "session_id",
-            "started_at"
-          ],
+          "columns": ["session_id", "started_at"],
           "isUnique": false
         }
       },
@@ -722,12 +678,8 @@
           "name": "verification_runs_session_id_debug_sessions_id_fk",
           "tableFrom": "verification_runs",
           "tableTo": "debug_sessions",
-          "columnsFrom": [
-            "session_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["session_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -735,12 +687,8 @@
           "name": "verification_runs_patch_id_patch_proposals_id_fk",
           "tableFrom": "verification_runs",
           "tableTo": "patch_proposals",
-          "columnsFrom": [
-            "patch_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["patch_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }

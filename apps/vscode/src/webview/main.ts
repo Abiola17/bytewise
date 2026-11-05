@@ -82,6 +82,9 @@ function icon(paths: string[], size = 16): SVGSVGElement {
 }
 const ICON = {
   plus: ["M12 5v14", "M5 12h14"],
+  slash: ["M9 4 4 12l5 8", "M15 4l5 8-5 8", "M14 4l-4 16"],
+  clock: ["M12 6v6l4 2", "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Z"],
+  more: ["M12 12h.01", "M19 12h.01", "M5 12h.01"],
   mic: [
     "M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z",
     "M19 10v2a7 7 0 0 1-14 0v-2",
@@ -90,6 +93,7 @@ const ICON = {
   send: ["M12 19V5", "M5 12l7-7 7 7"],
   stop: ["M7 7h10v10H7z"],
   x: ["M18 6 6 18", "M6 6l12 12"],
+  zap: ["M13 2 3 14h9l-1 8 10-12h-9l1-8Z"],
 };
 
 function iconButton(className: string, paths: string[], label: string): HTMLButtonElement {
@@ -102,8 +106,8 @@ function iconButton(className: string, paths: string[], label: string): HTMLButt
 }
 
 const input = el("textarea", { className: "input" });
-input.rows = 2;
-const PLACEHOLDER = "Ask Bytewise… Type @ to attach a file";
+input.rows = 1;
+const PLACEHOLDER = "Ask Bytewise about your code… Type @ to attach a file";
 input.placeholder = PLACEHOLDER;
 input.setAttribute("aria-label", "Message");
 
@@ -112,16 +116,17 @@ const tray = el("div", { className: "tray" });
 tray.hidden = true;
 const imagePicker = el("input");
 imagePicker.type = "file";
-imagePicker.accept = "image/png,image/jpeg,image/webp,image/gif";
+imagePicker.accept = "image/png,image/jpeg,image/webp";
 imagePicker.multiple = true;
 imagePicker.hidden = true;
 imagePicker.setAttribute("aria-label", "Attach image");
 
-const attachBtn = iconButton("tool-btn", ICON.plus, "Attach image");
+// Top row inside the composer card: textarea on left, more menu + mic on right
+const moreBtn = iconButton("tool-btn more-btn", ICON.more, "More options");
 const micBtn = iconButton(
   "tool-btn mic-btn",
   ICON.mic,
-  "Dictate (words appear in the box as you speak)",
+  "Click to speak (transcribes and sends to agent)",
 );
 const WAVE_BARS = 14;
 const micWave = el("span", { className: "mic-wave" });
@@ -129,29 +134,98 @@ const waveBars = Array.from({ length: WAVE_BARS }, () => el("span", { className:
 micWave.append(...waveBars);
 micWave.setAttribute("aria-hidden", "true");
 const micGroup = el("span", { className: "mic-group" }, micWave, micBtn);
+
+const topActions = el("div", { className: "composer-top-actions" }, moreBtn, micGroup);
+const topRow = el("div", { className: "composer-top" }, input, topActions);
+
+// Bottom toolbar inside composer card: + (image), [/] (files/@), clock (history), model badge, zap (Auto), send
+const attachBtn = iconButton("tool-btn attach-btn", ICON.plus, "Attach image (PNG, JPEG, WebP)");
+const slashBtn = iconButton("tool-btn slash-btn", ICON.slash, "Attach file (@)");
+const historyIconBtn = iconButton("tool-btn history-btn", ICON.clock, "Conversation history");
+const modelBadge = el("span", { className: "model-badge", text: "Muse Spark 1.3" });
+
+const autoBadge = el(
+  "span",
+  { className: "auto-badge" },
+  icon(ICON.zap, 12),
+  el("span", { text: "Auto" }),
+);
 const send = iconButton("send-btn", ICON.send, "Send (Enter)");
 send.type = "submit";
 const voiceNote = el("span", { className: "voice-note" });
 voiceNote.setAttribute("role", "status");
 
-const toolbar = el(
+const toolbarLeft = el(
   "div",
-  { className: "toolbar" },
+  { className: "toolbar-left" },
   attachBtn,
   imagePicker,
-  voiceNote,
-  el("span", { className: "spacer" }),
-  micGroup,
-  send,
+  slashBtn,
+  historyIconBtn,
+  modelBadge,
 );
+const toolbarRight = el("div", { className: "toolbar-right" }, autoBadge, send);
+const toolbar = el("div", { className: "toolbar" }, toolbarLeft, toolbarRight);
+
+// Dropdown menu for more options
+const moreMenu = el("div", { className: "more-menu" });
+moreMenu.hidden = true;
+const newChatMenuItem = el("button", { className: "menu-item", text: "+ New Chat" });
+newChatMenuItem.type = "button";
+newChatMenuItem.addEventListener("click", () => {
+  moreMenu.hidden = true;
+  vscode.postMessage({ type: "newChat" });
+});
+const historyMenuItem = el("button", { className: "menu-item", text: "Conversation History" });
+historyMenuItem.type = "button";
+historyMenuItem.addEventListener("click", () => {
+  moreMenu.hidden = true;
+  vscode.postMessage({ type: "viewHistory" });
+});
+const apiKeyMenuItem = el("button", { className: "menu-item", text: "Set Meta API Key" });
+apiKeyMenuItem.type = "button";
+apiKeyMenuItem.addEventListener("click", () => {
+  moreMenu.hidden = true;
+  vscode.postMessage({ type: "setKey" });
+});
+const voiceFileMenuItem = el("button", { className: "menu-item", text: "Transcribe Audio File…" });
+voiceFileMenuItem.type = "button";
+voiceFileMenuItem.addEventListener("click", () => {
+  moreMenu.hidden = true;
+  vscode.postMessage({ type: "requestVoiceFile" });
+});
+moreMenu.append(newChatMenuItem, historyMenuItem, apiKeyMenuItem, voiceFileMenuItem);
+
+moreBtn.addEventListener("click", (e) => {
+  e.stopPropagation();
+  moreMenu.hidden = !moreMenu.hidden;
+});
+document.addEventListener("click", (e) => {
+  if (!moreMenu.contains(e.target as Node) && e.target !== moreBtn) {
+    moreMenu.hidden = true;
+  }
+});
+
+slashBtn.addEventListener("click", () => {
+  const upto = input.value.slice(0, input.selectionStart ?? input.value.length);
+  const after = input.value.slice(input.selectionStart ?? input.value.length);
+  const gap = upto && !/\s$/.test(upto) ? " " : "";
+  input.value = `${upto}${gap}@${after}`;
+  const pos = upto.length + gap.length + 1;
+  input.focus();
+  input.setSelectionRange(pos, pos);
+  updateSuggestions();
+});
+
+historyIconBtn.addEventListener("click", () => vscode.postMessage({ type: "viewHistory" }));
 
 // @-mention suggestions, shown above the message box.
 const suggestions = el("ul", { className: "suggestions" });
 suggestions.setAttribute("role", "listbox");
 suggestions.setAttribute("aria-label", "Files to attach");
 suggestions.hidden = true;
-const box = el("div", { className: "box" }, tray, input, toolbar);
-const composer = el("form", { className: "composer" }, suggestions, box);
+const box = el("div", { className: "box" }, topRow, tray, toolbar, voiceNote);
+const composer = el("form", { className: "composer" }, suggestions, moreMenu, box);
 
 const setup = el(
   "div",
@@ -411,12 +485,19 @@ function empty(workspaceName: string | null) {
 
 // ---- Voice -----------------------------------------------------------------
 // The panel cannot use the microphone, so the extension records with ffmpeg and
-// streams it to Muse Voice Transcribe. Words appear in the box as they are
-// recognized; nothing is sent until the developer presses send.
+// streams it to Muse Voice Transcribe. When the developer clicks the mic button,
+// it records; clicking stop transcribes and directly sends to the AI agent.
 
 let recState: "idle" | "starting" | "recording" | "transcribing" = "idle";
 /** What was in the box before dictation started; speech is added after it. */
 let dictationPrefix: string | null = null;
+let autoSendVoice = false;
+
+function updateSendState() {
+  const canSend = Boolean(input.value.trim() || pendingImages.length > 0);
+  send.disabled = !canSend || busy;
+  send.classList.toggle("active", canSend && !busy);
+}
 
 function showDictation(text: string, final: boolean) {
   // Not dictating any more (e.g. the message was already sent): ignore late text.
@@ -426,9 +507,16 @@ function showDictation(text: string, final: boolean) {
   input.value = prefix + gap + text;
   input.scrollTop = input.scrollHeight;
   input.setSelectionRange(input.value.length, input.value.length);
+  input.style.height = "auto";
+  input.style.height = `${Math.min(input.scrollHeight, 180)}px`;
+  updateSendState();
   if (final) {
     dictationPrefix = null;
     input.focus();
+    if (autoSendVoice && input.value.trim()) {
+      autoSendVoice = false;
+      submit();
+    }
   }
 }
 
@@ -443,10 +531,11 @@ function showLevel(level: number) {
 function showRecording(state: typeof recState, error?: string) {
   recState = state;
   const active = state === "recording" || state === "starting";
+  box.classList.toggle("recording", active);
   micGroup.classList.toggle("recording", active);
   micGroup.classList.toggle("transcribing", state === "transcribing");
-  micBtn.replaceChildren(icon(active ? ICON.stop : ICON.mic));
-  const label = active ? "Stop dictation" : "Dictate (words appear in the box as you speak)";
+  micBtn.replaceChildren(icon(ICON.mic));
+  const label = active ? "Stop recording" : "Record voice (transcribes and sends to agent)";
   micBtn.title = label;
   micBtn.setAttribute("aria-label", label);
   micBtn.setAttribute("aria-pressed", String(active));
@@ -458,11 +547,11 @@ function showRecording(state: typeof recState, error?: string) {
   voiceNote.textContent =
     error ??
     (state === "starting"
-      ? "Starting the microphone…"
+      ? "Starting microphone…"
       : state === "recording"
-        ? "Listening… ■ to finish · Esc to cancel"
+        ? "Recording… Click mic to stop and send · Esc to cancel"
         : state === "transcribing"
-          ? "Finishing transcript…"
+          ? "Transcribing with Meta…"
           : "");
   voiceNote.classList.toggle("error", Boolean(error));
   if (error)
@@ -471,8 +560,10 @@ function showRecording(state: typeof recState, error?: string) {
 
 micBtn.addEventListener("click", () => {
   if (recState === "recording" || recState === "starting") {
+    autoSendVoice = true;
     vscode.postMessage({ type: "stopRecording" });
   } else if (recState === "idle" && !busy) {
+    autoSendVoice = true;
     dictationPrefix = input.value;
     showRecording("starting");
     vscode.postMessage({ type: "startRecording" });
@@ -481,6 +572,7 @@ micBtn.addEventListener("click", () => {
 
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && (recState === "recording" || recState === "starting")) {
+    autoSendVoice = false;
     vscode.postMessage({ type: "cancelRecording" });
   }
 });
@@ -511,12 +603,13 @@ function renderTray() {
     }),
   );
   tray.hidden = pendingImages.length === 0;
+  updateSendState();
 }
 
 function addImageFiles(files: Iterable<File>) {
   for (const file of files) {
-    if (!/^image\/(png|jpeg|webp|gif)$/.test(file.type)) {
-      showRecording(recState, `${file.name} is not a PNG, JPEG, WebP or GIF image.`);
+    if (!/^image\/(png|jpeg|webp)$/.test(file.type) && !/\.(png|jpe?g|webp)$/i.test(file.name)) {
+      showRecording(recState, `${file.name} is not a PNG, JPEG or WebP image.`);
       continue;
     }
     if (file.size > MAX_IMAGE_BYTES) {
@@ -530,9 +623,11 @@ function addImageFiles(files: Iterable<File>) {
     const reader = new FileReader();
     reader.onload = () => {
       const url = String(reader.result);
+      const comma = url.indexOf(",");
+      if (comma === -1) return;
       pendingImages.push({
         name: file.name || "pasted-image.png",
-        dataBase64: url.split(",")[1] ?? "",
+        dataBase64: url.slice(comma + 1),
         url,
       });
       renderTray();

@@ -1,5 +1,10 @@
 import { AppError } from "../../errors/app-error";
 import { providerErrors } from "../model-provider";
+import {
+  createMetaLiveTranscription,
+  type LiveHandlers,
+  type LiveTranscription,
+} from "./meta.live-transcription";
 
 /** 24 kHz, 16-bit, mono — the only input format Bytewise sends. */
 export const PCM_SAMPLE_RATE = 24_000;
@@ -20,7 +25,16 @@ export interface TranscriptionResult {
 export interface TranscriptionProvider {
   readonly model: string;
   transcribe(pcm: Buffer): Promise<TranscriptionResult>;
+  /** Streams audio as it is recorded and reports the text so far. */
+  live(handlers: LiveHandlers): LiveTranscription;
 }
+
+const notConfigured = () =>
+  new AppError(
+    503,
+    "provider_not_configured",
+    "Voice input needs META_API_KEY in .env (Muse Voice Transcribe is a Meta model).",
+  );
 
 type ServerEvent =
   | { type?: undefined; sessionId: string }
@@ -44,16 +58,12 @@ export function createMetaTranscriptionProvider(options: {
 
   return {
     model,
+    live(handlers) {
+      if (!options.apiKey) throw notConfigured();
+      return createMetaLiveTranscription({ apiKey: options.apiKey, url, model }, handlers);
+    },
     transcribe(pcm) {
-      if (!options.apiKey) {
-        return Promise.reject(
-          new AppError(
-            503,
-            "provider_not_configured",
-            "Voice input needs META_API_KEY in .env (Muse Voice Transcribe is a Meta model).",
-          ),
-        );
-      }
+      if (!options.apiKey) return Promise.reject(notConfigured());
       const apiKey = options.apiKey;
       const audioMs = Math.round((pcm.length / PCM_BYTES_PER_SECOND) * 1000);
       // Sending takes ~half the audio length; allow that plus the configured budget.

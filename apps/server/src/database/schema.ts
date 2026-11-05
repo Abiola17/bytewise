@@ -175,6 +175,27 @@ export const screenshots = sqliteTable(
   (table) => [index("screenshots_session_idx").on(table.sessionId, table.createdAt)],
 );
 
+/** Images attached to a user message. The bytes live in the screenshots directory. */
+export const messageImages = sqliteTable(
+  "message_images",
+  {
+    id: text("id").primaryKey(),
+    messageId: text("message_id")
+      .notNull()
+      .references(() => messages.id, { onDelete: "cascade" }),
+    sessionId: text("session_id")
+      .notNull()
+      .references(() => debugSessions.id, { onDelete: "cascade" }),
+    fileName: text("file_name"),
+    mimeType: text("mime_type").notNull(),
+    width: integer("width").notNull(),
+    height: integer("height").notNull(),
+    sha256: text("sha256").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [index("message_images_message_idx").on(table.messageId)],
+);
+
 export type ProjectRow = typeof projects.$inferSelect;
 export type NewProjectRow = typeof projects.$inferInsert;
 export type DebugSessionRow = typeof debugSessions.$inferSelect;
@@ -184,3 +205,4 @@ export type DiagnosisRow = typeof diagnoses.$inferSelect;
 export type PatchProposalRow = typeof patchProposals.$inferSelect;
 export type VerificationRunRow = typeof verificationRuns.$inferSelect;
 export type ScreenshotRow = typeof screenshots.$inferSelect;
+export type MessageImageRow = typeof messageImages.$inferSelect;

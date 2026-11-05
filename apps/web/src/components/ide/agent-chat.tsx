@@ -7,15 +7,27 @@ import {
   Bug,
   ImagePlus,
   Loader2,
+  Mic,
   Play,
   RotateCw,
   ShieldCheck,
   Sparkles,
+  Square,
+  X,
 } from "lucide-react";
-import type { PatchProposal, SessionDetail, VerificationRun } from "@bytewise/shared";
+import {
+  MAX_MESSAGE_IMAGES,
+  MAX_SCREENSHOT_BYTES,
+  SCREENSHOT_MIME_TYPES,
+  type PatchProposal,
+  type PostMessageRequest,
+  type SessionDetail,
+  type VerificationRun,
+} from "@bytewise/shared";
 import { cn } from "@/lib/utils";
+import { messageImageUrl } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
-import { VoiceButton } from "@/components/chat/voice-button";
+import { useLiveDictation } from "@/hooks/use-live-dictation";
 import { RichText, type OpenFileRef } from "./rich-text";
 import {
   DiagnosisCard,
@@ -40,14 +52,25 @@ const SUGGESTIONS = [
   { title: "Tour the project", prompt: "Explain how this project is structured." },
 ];
 
+export type PendingChatMessage =
+  | string
+  | {
+      content: string;
+      images?: Array<{ name?: string; preview: string }>;
+    };
+
 export interface AgentChatProps {
   projectName: string;
   detail: SessionDetail | null;
   knownFiles: Set<string>;
-  pending: string | null;
+  pending: PendingChatMessage | null;
   sending: boolean;
   chatError: string | null;
-  onSend: (content: string) => Promise<boolean>;
+  onSend: (
+    content: string,
+    images?: PostMessageRequest["images"],
+    previews?: Array<{ name?: string; preview: string }>,
+  ) => Promise<boolean>;
   onRetry: () => void;
   onOpenFile: OpenFileRef;
   onOpenEvidence: (item: StoredEvidence) => void;
@@ -63,7 +86,6 @@ export interface AgentChatProps {
   runError: string | null;
   onRun: (script: string) => void;
   onShowRun: (runId: string) => void;
-  onAttachScreenshot: () => void;
   modelLabel: string | null;
 }
 
@@ -83,11 +105,103 @@ export function AgentChat(props: AgentChatProps) {
     });
   }, []);
 
-  // Dictated text is appended for review; the developer still decides to send it.
-  const appendTranscript = useCallback((text: string) => {
-    setDraft((current) => (current.trim() ? `${current.trimEnd()} ${text}` : text));
-    inputRef.current?.focus();
+  // ---- Live dictation: words appear in the box as they are recognized. ----
+  // What was typed before the mic started; speech is shown after it.
+  const dictationPrefix = useRef<string | null>(null);
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+  const showDictation = useCallback((text: string, final: boolean) => {
+    const prefix = dictationPrefix.current;
+    if (prefix === null) return; // already sent or cancelled: ignore late text
+    const gap = prefix && text && !/\s$/.test(prefix) ? " " : "";
+    setDraft(prefix + gap + text);
+    if (final) {
+      dictationPrefix.current = null;
+      requestAnimationFrame(() => {
+        const el = inputRef.current;
+        if (!el) return;
+        el.focus();
+        el.setSelectionRange(el.value.length, el.value.length);
+      });
+    }
   }, []);
+  const dictation = useLiveDictation(showDictation);
+  const listening = dictation.status === "starting" || dictation.status === "recording";
+
+  function startDictation() {
+    dictationPrefix.current = draftRef.current;
+    void dictation.start();
+  }
+  function cancelDictation() {
+    const prefix = dictationPrefix.current;
+    dictationPrefix.current = null;
+    dictation.cancel();
+    if (prefix !== null) setDraft(prefix);
+  }
+
+  // ---- Images attached to the next message. ----
+  const [images, setImages] = useState<
+    Array<{
+      name: string;
+      mimeType: PostMessageRequest["images"][number]["mimeType"];
+      data: string;
+      preview: string;
+    }>
+  >([]);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  function normalizeMimeType(
+    type: string,
+    name: string,
+  ): PostMessageRequest["images"][number]["mimeType"] | null {
+    if (type === "image/png") return "image/png";
+    if (type === "image/jpeg" || type === "image/jpg" || type === "image/pjpeg") return "image/jpeg";
+    if (type === "image/webp") return "image/webp";
+    const ext = name.split(".").pop()?.toLowerCase();
+    if (ext === "png") return "image/png";
+    if (ext === "jpg" || ext === "jpeg") return "image/jpeg";
+    if (ext === "webp") return "image/webp";
+    return null;
+  }
+
+  function addImageFiles(files: Iterable<File>) {
+    setImageError(null);
+    for (const file of files) {
+      const mime = normalizeMimeType(file.type, file.name);
+      if (!mime) {
+        setImageError(`${file.name || "That file"} is not a PNG, JPEG or WebP image.`);
+        continue;
+      }
+      if (file.size > MAX_SCREENSHOT_BYTES) {
+        setImageError(`${file.name || "That image"} is larger than 4 MB.`);
+        continue;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const url = String(reader.result);
+        const comma = url.indexOf(",");
+        if (comma === -1) return;
+        setImages((current) => {
+          if (current.length >= MAX_MESSAGE_IMAGES) {
+            setImageError(`You can attach up to ${MAX_MESSAGE_IMAGES} images.`);
+            return current;
+          }
+          return [
+            ...current,
+            {
+              name: (file.name || "pasted-image").slice(0, 100),
+              mimeType: mime,
+              data: url.slice(comma + 1),
+              preview: url,
+            },
+          ];
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+  }
 
   // Grow the textarea with its content, up to a limit.
   useEffect(() => {
@@ -138,9 +252,16 @@ export function AgentChat(props: AgentChatProps) {
     latestPatch?.status === "applied" &&
     !detail?.verifications.some((r) => r.patchId === latestPatch.id);
 
+  const canSend = draft.trim().length >= 3 || images.length > 0;
+
   async function submit() {
     const content = draft.trim();
-    if (content.length < 3 || busy) return;
+    if (!canSend || busy) return;
+    // Sending ends a dictation in progress; its words are already in the box.
+    if (dictation.status !== "idle") {
+      dictationPrefix.current = null;
+      dictation.cancel();
+    }
     const runMatch = content.match(/^\/run(?:\s+(\S+))?$/i);
     if (runMatch) {
       const script = runMatch[1];
@@ -150,7 +271,26 @@ export function AgentChat(props: AgentChatProps) {
       }
       return;
     }
-    if (await props.onSend(content)) setDraft("");
+    const attached = images.map(({ name, mimeType, data }) => ({
+      fileName: (name || "image").slice(0, 100),
+      mimeType,
+      data,
+    }));
+    const attachedPreviews = images.map(({ name, preview }) => ({ name, preview }));
+
+    // Optimistically clear the input field and tray immediately upon sending
+    const prevDraft = draft;
+    const prevImages = images;
+    setDraft("");
+    setImages([]);
+    setImageError(null);
+
+    const ok = await props.onSend(content, attached, attachedPreviews);
+    if (!ok) {
+      // Restore input state if sending could not be completed
+      setDraft(prevDraft);
+      setImages(prevImages);
+    }
   }
 
   const empty = timeline.length === 0 && !pending;
@@ -199,7 +339,27 @@ export function AgentChat(props: AgentChatProps) {
                 const m = item.message;
                 if (m.role === "user") {
                   return (
-                    <div key={m.id} className="flex justify-end">
+                    <div key={m.id} className="flex flex-col items-end gap-1.5">
+                      {m.images.length > 0 && (
+                        <div className="flex max-w-[88%] flex-wrap justify-end gap-1.5">
+                          {m.images.map((image) => (
+                            <a
+                              key={image.id}
+                              href={messageImageUrl(image.id)}
+                              target="_blank"
+                              rel="noreferrer"
+                              title={image.fileName ?? "Attached image"}
+                              className="overflow-hidden rounded-lg border bg-card"
+                            >
+                              <img
+                                src={messageImageUrl(image.id)}
+                                alt={image.fileName ?? "Attached image"}
+                                className="h-20 max-w-40 object-cover"
+                              />
+                            </a>
+                          ))}
+                        </div>
+                      )}
                       <div className="max-w-[88%] rounded-2xl rounded-br-md bg-primary/12 px-3.5 py-2 text-sm whitespace-pre-wrap break-words ring-1 ring-primary/20">
                         {m.content}
                       </div>
@@ -262,10 +422,29 @@ export function AgentChat(props: AgentChatProps) {
             })}
 
             {pending && (
-              <div className="flex justify-end opacity-70">
-                <div className="max-w-[88%] rounded-2xl rounded-br-md bg-primary/12 px-3.5 py-2 text-sm whitespace-pre-wrap break-words ring-1 ring-primary/20">
-                  {pending}
-                </div>
+              <div className="flex flex-col items-end gap-1.5 opacity-70">
+                {typeof pending === "object" && pending.images && pending.images.length > 0 && (
+                  <div className="flex max-w-[88%] flex-wrap justify-end gap-1.5">
+                    {pending.images.map((image, i) => (
+                      <div
+                        key={i}
+                        title={image.name ?? "Attached image"}
+                        className="overflow-hidden rounded-lg border bg-card shadow-sm"
+                      >
+                        <img
+                          src={image.preview}
+                          alt={image.name ?? "Attached image"}
+                          className="h-20 max-w-40 object-cover"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {(typeof pending === "string" ? pending : pending.content) ? (
+                  <div className="max-w-[88%] rounded-2xl rounded-br-md bg-primary/12 px-3.5 py-2 text-sm whitespace-pre-wrap break-words ring-1 ring-primary/20">
+                    {typeof pending === "string" ? pending : pending.content}
+                  </div>
+                ) : null}
               </div>
             )}
 
@@ -326,7 +505,46 @@ export function AgentChat(props: AgentChatProps) {
         }}
         className="p-3"
       >
-        <div className="rounded-xl border bg-card/70 shadow-sm transition-colors focus-within:border-primary/50">
+        <div
+          className={cn(
+            "rounded-xl border bg-card/70 shadow-sm transition-colors focus-within:border-primary/50",
+            dragging && "border-primary",
+          )}
+          onDragOver={(e) => {
+            if (!e.dataTransfer.types.includes("Files")) return;
+            e.preventDefault();
+            setDragging(true);
+          }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={(e) => {
+            if (!e.dataTransfer.files.length) return;
+            e.preventDefault();
+            setDragging(false);
+            addImageFiles(e.dataTransfer.files);
+          }}
+        >
+          {images.length > 0 && (
+            <div className="flex flex-wrap gap-2 px-3 pt-3">
+              {images.map((image, i) => (
+                <div key={`${image.name}-${i}`} className="group relative">
+                  <img
+                    src={image.preview}
+                    alt={image.name}
+                    title={image.name}
+                    className="size-14 rounded-md border object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setImages((current) => current.filter((_, j) => j !== i))}
+                    aria-label={`Remove ${image.name}`}
+                    className="absolute -top-1.5 -right-1.5 flex size-5 items-center justify-center rounded-full border bg-background text-muted-foreground shadow-sm hover:text-foreground"
+                  >
+                    <X className="size-3" aria-hidden />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
           <label htmlFor="chat-input" className="sr-only">
             Message
           </label>
@@ -336,32 +554,99 @@ export function AgentChat(props: AgentChatProps) {
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
+              if (e.key === "Escape" && listening) {
+                e.preventDefault();
+                cancelDictation();
+                return;
+              }
               if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                 e.preventDefault();
                 void submit();
               }
             }}
+            onPaste={(e) => {
+              const files = [...e.clipboardData.files].filter((f) => f.type.startsWith("image/"));
+              if (files.length) {
+                e.preventDefault();
+                addImageFiles(files);
+              }
+            }}
             rows={2}
             disabled={sending}
             placeholder={
-              detail ? "Reply, or type /run test" : "Describe a bug or ask about the code…"
+              listening
+                ? "Listening… speak and your words appear here"
+                : detail
+                  ? "Reply, or type /run test"
+                  : "Describe a bug or ask about the code…"
             }
             className="block max-h-[220px] min-h-[52px] w-full resize-none bg-transparent px-3.5 pt-3 pb-1 text-sm placeholder:text-muted-foreground/70 focus-visible:outline-none disabled:opacity-60"
           />
           <div className="flex items-center gap-1 px-2 pb-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={SCREENSHOT_MIME_TYPES.join(",")}
+              multiple
+              hidden
+              onChange={(e) => {
+                if (e.target.files) addImageFiles(e.target.files);
+                e.target.value = "";
+              }}
+            />
             <Button
               type="button"
               size="icon"
               variant="ghost"
               className="size-8 text-muted-foreground"
-              onClick={props.onAttachScreenshot}
-              disabled={!detail}
-              title={detail ? "Add a screenshot of the bug" : "Send a message first to add screenshots"}
-              aria-label="Add a screenshot"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={sending || images.length >= MAX_MESSAGE_IMAGES}
+              title="Attach images (or paste / drop them here)"
+              aria-label="Attach images"
             >
               <ImagePlus aria-hidden />
             </Button>
-            <VoiceButton compact disabled={sending} onTranscript={appendTranscript} />
+            <div
+              className={cn(
+                "flex items-center rounded-lg transition-colors",
+                listening && "bg-accent pl-2",
+              )}
+            >
+              {dictation.status === "recording" && (
+                <span aria-hidden className="mr-1.5 flex h-4 items-center gap-[2px]">
+                  {dictation.levels.map((level, i) => (
+                    <span
+                      key={i}
+                      className="w-[2px] rounded-full bg-foreground transition-[height] duration-100 ease-linear"
+                      style={{ height: `${Math.round(15 + level * 85)}%` }}
+                    />
+                  ))}
+                </span>
+              )}
+              <Button
+                type="button"
+                size="icon"
+                variant={listening ? "default" : "ghost"}
+                className={cn("size-8", !listening && "text-muted-foreground")}
+                disabled={sending || dictation.status === "finishing"}
+                onClick={() => (listening ? void dictation.stop() : startDictation())}
+                aria-pressed={listening}
+                aria-label={listening ? "Stop dictation" : "Dictate"}
+                title={
+                  listening
+                    ? "Stop dictation (Esc cancels)"
+                    : "Dictate — your words appear in the box as you speak"
+                }
+              >
+                {dictation.status === "finishing" ? (
+                  <Loader2 className="animate-spin" aria-hidden />
+                ) : listening ? (
+                  <Square className="fill-current" aria-hidden />
+                ) : (
+                  <Mic aria-hidden />
+                )}
+              </Button>
+            </div>
             {props.commands.length > 0 && (
               <div className="ml-1 hidden items-center gap-1 sm:flex">
                 {props.commands.slice(0, 3).map((c) => (
@@ -386,17 +671,29 @@ export function AgentChat(props: AgentChatProps) {
             <Button
               type="submit"
               size="icon"
-              className={cn("size-8 rounded-lg", draft.trim().length < 3 && "opacity-40")}
-              disabled={busy || draft.trim().length < 3}
+              className={cn("size-8 rounded-lg", !canSend && "opacity-40")}
+              disabled={busy || !canSend}
               aria-label="Send"
             >
               {sending ? <Loader2 className="animate-spin" aria-hidden /> : <ArrowUp aria-hidden />}
             </Button>
           </div>
         </div>
-        <p className="mt-1.5 px-1 text-[11px] text-muted-foreground/70">
-          Enter to send · Shift+Enter for a new line · Bytewise asks before editing files
-        </p>
+        {dictation.error || imageError ? (
+          <p role="alert" className="mt-1.5 px-1 text-[11px] text-destructive">
+            {dictation.error ?? imageError}
+          </p>
+        ) : (
+          <p className="mt-1.5 px-1 text-[11px] text-muted-foreground/70" role="status">
+            {dictation.status === "starting"
+              ? "Starting the microphone…"
+              : dictation.status === "recording"
+                ? "Listening… click ■ to finish · Esc to cancel · Enter sends and stops the mic"
+                : dictation.status === "finishing"
+                  ? "Finishing transcript…"
+                  : "Enter to send · Shift+Enter for a new line · Bytewise asks before editing files"}
+          </p>
+        )}
       </form>
     </div>
   );

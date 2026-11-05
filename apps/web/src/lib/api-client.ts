@@ -23,6 +23,7 @@ import {
   type CreateProjectRequest,
   type CreateScreenshotRequest,
   type ImportProjectRequest,
+  type PostMessageRequest,
 } from "@bytewise/shared";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
@@ -116,10 +117,10 @@ export const api = {
     }),
   getSession: (sessionId: string) =>
     request(`/sessions/${encodeURIComponent(sessionId)}`, sessionDetailSchema),
-  postMessage: (sessionId: string, content: string) =>
+  postMessage: (sessionId: string, content: string, images: PostMessageRequest["images"] = []) =>
     request(`/sessions/${encodeURIComponent(sessionId)}/messages`, sessionDetailSchema, {
       method: "POST",
-      body: { content },
+      body: images.length ? { content, images } : { content },
     }),
   retryDiagnosis: (sessionId: string) =>
     request(`/sessions/${encodeURIComponent(sessionId)}/diagnose`, sessionDetailSchema, {
@@ -165,6 +166,13 @@ export const api = {
       body,
     }),
 };
+
+export const messageImageUrl = (imageId: string) =>
+  `${API_URL}${API_PREFIX}/message-images/${encodeURIComponent(imageId)}/image`;
+
+/** WebSocket for live dictation; audio goes to the server, which holds the Meta key. */
+export const liveTranscriptionUrl = () =>
+  `${API_URL.replace(/^http/, "ws")}${API_PREFIX}/transcriptions/live`;
 
 export const screenshotImageUrl = (screenshotId: string) =>
   `${API_URL}${API_PREFIX}/screenshots/${encodeURIComponent(screenshotId)}/image`;

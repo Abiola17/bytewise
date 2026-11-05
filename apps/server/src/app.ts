@@ -1,5 +1,6 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import cors from "@fastify/cors";
+import websocket from "@fastify/websocket";
 import { API_PREFIX } from "@bytewise/shared";
 import type { AppConfig } from "./config/env";
 import { openDatabase } from "./database/client";
@@ -24,6 +25,7 @@ import { createProjectImportService } from "./services/project-import.service";
 import { createSessionService } from "./services/session.service";
 import { createDiagnosisService } from "./services/diagnosis.service";
 import { createDebuggingService } from "./services/debugging.service";
+import { createMessageImagesService } from "./services/message-images.service";
 import { createPatchService } from "./services/patch.service";
 import { createVerificationService } from "./services/verification.service";
 import { createDashboardService } from "./services/dashboard.service";
@@ -61,6 +63,8 @@ export async function buildApp(
   const database = openDatabase(config.databasePath);
 
   await app.register(cors, { origin: config.env.WEB_ORIGIN });
+  // Live dictation frames are small; anything bigger is not audio from the web app.
+  await app.register(websocket, { options: { maxPayload: 256 * 1024 } });
   registerErrorHandler(app);
 
   const projectService = createProjectService({
@@ -123,6 +127,7 @@ export async function buildApp(
       }),
     screenshotsDir: config.screenshotsDir,
   });
+  const messageImages = createMessageImagesService({ sessions, dir: config.screenshotsDir });
   const debuggingService = createDebuggingService({
     sessions,
     verifications,
@@ -130,6 +135,7 @@ export async function buildApp(
     projectService,
     projectFiles,
     diagnosisService,
+    messageImages,
   });
 
   await app.register(
@@ -151,7 +157,9 @@ export async function buildApp(
       await api.register(
         dashboardRoutes({ dashboardService: createDashboardService({ db: database.db }) }),
       );
-      await api.register(mediaRoutes({ mediaService }));
+      await api.register(
+        mediaRoutes({ mediaService, messageImages, webOrigin: config.env.WEB_ORIGIN }),
+      );
     },
     { prefix: API_PREFIX },
   );

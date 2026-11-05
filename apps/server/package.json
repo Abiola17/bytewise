@@ -15,6 +15,7 @@
     "@bytewise/execution": "workspace:*",
     "@bytewise/shared": "workspace:*",
     "@fastify/cors": "^10.0.2",
+    "@fastify/websocket": "^11.3.7",
     "better-sqlite3": "^11.8.1",
     "diff": "^7.0.0",
     "dotenv": "^16.4.7",

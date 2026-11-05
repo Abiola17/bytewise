@@ -50,10 +50,13 @@ export function sessionRoutes(deps: {
     });
 
     // Submit a debugging request: stores it, gathers evidence and diagnoses.
-    app.post("/sessions/:sessionId/messages", async (request) => {
+    // Up to 4 images of 4 MB each, sent as base64.
+    app.post("/sessions/:sessionId/messages", { bodyLimit: 24 * 1024 * 1024 }, async (request) => {
       const { sessionId } = sessionParamsSchema.parse(request.params);
-      const { content } = postMessageRequestSchema.parse(request.body);
-      return sessionDetailSchema.parse(await debuggingService.postMessage(sessionId, content));
+      const { content, images } = postMessageRequestSchema.parse(request.body);
+      return sessionDetailSchema.parse(
+        await debuggingService.postMessage(sessionId, content, images),
+      );
     });
 
     // Re-run diagnosis for the latest unanswered request.

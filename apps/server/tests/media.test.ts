@@ -59,6 +59,9 @@ describe("media API", () => {
       transcribed.push(pcm);
       return { text: "the login endpoint returns 500", audioMs: 1000, model: "test-voice" };
     },
+    live() {
+      throw new Error("not used");
+    },
   };
   const segmentation: SegmentationProvider = {
     model: "test-sam",

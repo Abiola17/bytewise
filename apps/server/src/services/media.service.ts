@@ -18,6 +18,10 @@ import {
   PCM_BYTES_PER_SECOND,
   type TranscriptionProvider,
 } from "../providers/meta/meta.transcription";
+import type { LiveHandlers, LiveTranscription } from "../providers/meta/meta.live-transcription";
+
+/** Live dictation stops by itself after this much audio. */
+export const MAX_LIVE_AUDIO_BYTES = MAX_TRANSCRIPTION_SECONDS * PCM_BYTES_PER_SECOND;
 import type { SegmentationProvider } from "../providers/meta/meta.segmentation";
 import type { SessionService } from "./session.service";
 
@@ -59,6 +63,11 @@ export function createMediaService(deps: {
         throw badRequest(`Recordings are limited to ${MAX_TRANSCRIPTION_SECONDS} seconds.`);
       }
       return transcription.transcribe(pcm);
+    },
+
+    /** Starts live dictation; the caller streams audio in and gets text back as it is recognized. */
+    liveTranscription(handlers: LiveHandlers): LiveTranscription {
+      return transcription.live(handlers);
     },
 
     /**
