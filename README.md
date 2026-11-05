@@ -4,7 +4,6 @@ AI debugging assistant: **source evidence → AI diagnosis → minimal patch →
 
 **New here? Read the [user guide](docs/user-guide.md)** — a step-by-step walkthrough of the app.
 
-See [implementation.md](implementation.md) for the full product brief and phase plan.
 
 ## Requirements
 
